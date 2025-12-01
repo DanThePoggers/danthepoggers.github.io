@@ -3,272 +3,248 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pirâmides Regulares — Educacional (Interativo)</title>
+  <title>Pirâmides Regulares — Modelos 3D Interativos</title>
 
-  <!-- Estilo -->
   <style>
-    :root{
-      --bg:#f7f9fb;
-      --card:#ffffff;
-      --muted:#6b7280;
-      --accent:#0b5;
-      --accent-strong:#0a9440;
-      --text:#111827;
-      --glass: rgba(255,255,255,0.65);
-      --shadow: 0 6px 18px rgba(15,23,42,0.06);
-      --radius:12px;
-      --gap:12px;
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:Arial,Helvetica,sans-serif;
+      background:#f4f6f8;
     }
-    [data-theme="dark"]{
-      --bg:#0f1724;
-      --card:#0b1220;
-      --muted:#9ca3af;
-      --accent:#3ddc84;
-      --accent-strong:#28b466;
-      --text:#e6eef6;
-      --glass: rgba(255,255,255,0.03);
-      --shadow: 0 6px 26px rgba(2,6,23,0.6);
-    }
-
-    html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Arial, Helvetica, sans-serif;background:var(--bg);color:var(--text)}
-    #app{display:flex;flex-direction:column;height:100vh}
-    header{
-      padding:14px 16px;
+    #app{
       display:flex;
-      gap:14px;
-      align-items:center;
-      background:linear-gradient(90deg,var(--glass),transparent);
-      box-shadow:var(--shadow);
-      backdrop-filter: blur(6px);
+      flex-direction:column;
+      height:100vh;
     }
-    header h1{margin:0;font-size:18px;letter-spacing:-0.2px}
-    header .sub{font-size:13px;color:var(--muted);opacity:0.95}
-    .spacer{flex:1}
-
-    main{flex:1;display:flex;gap:var(--gap);padding:14px;align-items:stretch}
-
-    /* visual */
+    header{
+      padding:12px 16px;
+      background:#0b5;
+      color:#003;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    header h1{
+      font-size:16px;
+      margin:0;
+    }
+    main{
+      flex:1;
+      display:flex;
+      gap:12px;
+      padding:12px;
+    }
     #viewer{
       flex:1;
-      border-radius:var(--radius);
-      background:linear-gradient(180deg,#111216 0%, #0b0d10 60%);
+      border-radius:12px;
+      background:#111;
       overflow:hidden;
-      min-height:360px;
-      display:flex;align-items:center;justify-content:center;position:relative;
-      box-shadow:var(--shadow);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:350px;
     }
-
-    /* controls */
     #controls{
-      width:360px;max-width:42%;
-      background:var(--card);
-      border-radius:var(--radius);
-      padding:14px;
-      box-shadow:var(--shadow);
-      display:flex;flex-direction:column;gap:10px;
-      min-height:200px;overflow:auto;
+      width:320px;
+      max-width:40%;
+      background:#fff;
+      border-radius:12px;
+      padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+      overflow:auto;
     }
-
-    .row{display:flex;gap:10px;align-items:center}
-    label{display:block;font-size:13px;color:var(--text);font-weight:600}
-    select,input[type=number], .seg{
-      width:100%;padding:10px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);font-size:14px;background:transparent;
-      color:var(--text);box-sizing:border-box;
+    label{
+      display:block;
+      font-size:13px;
+      margin-top:10px;
     }
-    .seg{display:flex;gap:6px}
-    .seg button{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);background:transparent;cursor:pointer}
-    .seg button.active{background:linear-gradient(180deg,var(--accent),var(--accent-strong));color:#fff;border:0}
-    button.primary{
-      padding:11px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent),var(--accent-strong));
-      color:#fff;font-weight:700;cursor:pointer;font-size:15px;
+    input[type=range]{width:100%}
+    input[type=number],select{
+      width:100%;
+      padding:6px;
+      margin-top:6px;
+      border-radius:6px;
+      border:1px solid #ddd;
     }
-    button.ghost{padding:10px;border-radius:10px;border:1px solid rgba(15,23,42,0.06);background:transparent;cursor:pointer}
-
-    .hint{font-size:13px;color:var(--muted);margin-top:6px}
-    .metric{background:linear-gradient(180deg,rgba(10,12,16,0.03),transparent);padding:10px;border-radius:10px;font-size:13px;color:var(--muted)}
-    .formula{background:rgba(0,0,0,0.03);padding:10px;border-radius:8px;font-family:Menlo,monospace;font-size:13px;color:var(--muted)}
-    .controls-section{display:flex;flex-direction:column;gap:8px}
-
-    footer{padding:10px 14px;font-size:12px;color:var(--muted);text-align:center}
-
-    /* small screens */
-    @media (max-width:980px){
-      main{flex-direction:column;padding:10px}
-      #controls{width:100%;max-width:100%;max-height:44vh}
+    button{
+      margin-top:10px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:0;
+      background:#0b5;
+      color:#fff;
+      cursor:pointer;
     }
-
-    /* small utility */
-    .tiny{font-size:12px;color:var(--muted)}
-    .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(15,23,42,0.04);font-size:12px}
-    .view-buttons{display:flex;gap:6px}
-    .watermark{position:fixed;bottom:10px;right:10px;font-size:11px;color:rgba(0,0,0,0.12);pointer-events:none}
+    footer{
+      padding:8px 12px;
+      font-size:12px;
+      color:#666;
+    }
+    .metric{
+      background:#eef;
+      padding:8px;
+      border-radius:8px;
+      margin-top:8px;
+    }
+    @media (max-width:900px){
+      main{flex-direction:column}
+      #controls{width:100%;max-width:100%}
+    }
+    .watermark {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.35);
+      pointer-events: none;
+      user-select: none;
+      z-index: 9999;
+    }
   </style>
 </head>
-<body data-theme="light">
+
+<body>
   <div id="app">
     <header>
-      <div>
-        <h1>Pirâmides Regulares — Tema Educacional</h1>
-        <div class="sub">Interatividade | Fórmulas dinâmicas | Exportar GLB</div>
-      </div>
-
-      <div class="spacer"></div>
-
-      <div class="row" style="gap:8px;align-items:center">
-        <div class="tag" id="tourStatus">Tour: OFF</div>
-        <button id="toggleTheme" class="ghost" title="Alternar tema">Modo Escuro</button>
-      </div>
+      <h1>Pirâmides Regulares — Modelos 3D Interativos (mobile-ready)</h1>
+      <div style="font-size:12px;color:#003;opacity:0.9">Toque e arraste para rotacionar; pinça para zoom</div>
     </header>
 
     <main>
-      <div id="viewer" aria-label="Área do visualizador 3D"></div>
+      <div id="viewer"></div>
 
-      <aside id="controls" aria-label="Controles">
-        <div class="controls-section">
-          <label>Tipo de base (n lados)</label>
+      <aside id="controls">
+        <label>Tipo de base (n lados)
           <select id="sides">
             <option value="3">Triangular (3)</option>
             <option value="4" selected>Quadrada (4)</option>
             <option value="5">Pentagonal (5)</option>
             <option value="6">Hexagonal (6)</option>
-            <option value="8">Octogonal (8)</option>
           </select>
-        </div>
+        </label>
 
-        <div class="controls-section">
-          <label>Comprimento do lado da base (cm)</label>
+        <label>Comprimento do lado da base (cm)
           <input id="sideLen" type="number" min="0.5" step="0.1" value="4">
-        </div>
+        </label>
 
-        <div class="controls-section">
-          <label>Altura da pirâmide (cm)</label>
+        <label>Altura da pirâmide (cm)
           <input id="height" type="number" min="0.5" step="0.1" value="6">
+        </label>
+
+        <label>Apótema lateral (a1) — opcional (se vazio, é calculado)
+          <input id="apotemaLat" type="number" step="0.1" placeholder="Deixe em branco para calcular">
+        </label>
+
+        <label>Cor do material
+          <select id="color">
+            <option value="#e07a5f">Terracota</option>
+            <option value="#3d5a80" selected>Azul escuro</option>
+            <option value="#98c1d9">Azul claro</option>
+            <option value="#2a9d8f">Verde</option>
+            <option value="#f4d35e">Amarelo</option>
+          </select>
+        </label>
+
+        <button id="build">Gerar Pirâmide</button>
+        <button id="download">Exportar GLB</button>
+
+        <div class="metric" id="metrics">
+          <strong>Métricas (automático)</strong>
+          <div id="mPerimeter">Perímetro: —</div>
+          <div id="mAreaBase">Área da base: —</div>
+          <div id="mAreaLat">Área lateral: —</div>
+          <div id="mAreaTotal">Área total: —</div>
+          <div id="mVolume">Volume: —</div>
         </div>
 
-        <div class="controls-section">
-          <label>Material (look)</label>
-          <div class="seg" id="matSeg">
-            <button data-mat="stone" class="active">Pedra</button>
-            <button data-mat="ceramic">Cerâmica</button>
-            <button data-mat="metal">Metal</button>
-          </div>
-          <div class="hint">Escolha um acabamento para fins didáticos.</div>
+        <div style="font-size:12px;color:#444;margin-top:12px">
+          Em celulares: use dois dedos para zoom e arraste para rotacionar.  
+          O botão "Exportar GLB" baixa o modelo 3D.
         </div>
-
-        <div class="controls-section">
-          <label>Aparência</label>
-          <div class="row view-buttons">
-            <button id="btnFront" class="ghost">Frente</button>
-            <button id="btnTop" class="ghost">Topo</button>
-            <button id="btnIso" class="ghost">Isométrica</button>
-            <button id="btnAuto" class="ghost">Auto-tour</button>
-          </div>
-        </div>
-
-        <div class="controls-section">
-          <label>Opções de exibição</label>
-          <div class="row">
-            <button id="toggleEdges" class="ghost">Destacar arestas</button>
-            <button id="download" class="primary" style="flex:1">Exportar GLB</button>
-          </div>
-        </div>
-
-        <div class="controls-section">
-          <label>Métricas</label>
-          <div class="metric" id="mPerimeter">Perímetro: —</div>
-          <div class="metric" id="mAreaBase">Área da base: —</div>
-          <div class="metric" id="mAreaLat">Área lateral: —</div>
-          <div class="metric" id="mAreaTotal">Área total: —</div>
-          <div class="metric" id="mVolume">Volume: —</div>
-        </div>
-
-        <div class="controls-section">
-          <label>Fórmulas (valores preenchidos automaticamente)</label>
-          <div class="formula" id="formulaPer">Perímetro: P = n · l = —</div>
-          <div class="formula" id="formulaAp">Apótema da base: a = l / (2·tan(π/n)) = —</div>
-          <div class="formula" id="formulaAb">Área base: Ab = (P · a)/2 = —</div>
-          <div class="formula" id="formulaAl">Apótema lateral (a₁): a₁ = √(r² + h²) = —</div>
-          <div class="formula" id="formulaV">Volume: V = (Ab · h)/3 = —</div>
-        </div>
-
-        <div class="tiny" style="margin-top:6px">Dica: no mobile, use dois dedos para zoom e toque+arraste para rotacionar.</div>
       </aside>
     </main>
 
-    <footer>Criado para fins didáticos — Tema Educacional</footer>
+    <footer>Gerado automaticamente — Modelo Educacional de Pirâmide Regular</footer>
   </div>
 
-  <div class="watermark">Danilo Neves • Equipe Educacional</div>
+  <div class="watermark">Danilo Neves • Thiago Alexandre • Roberta Kelly • Odilardo • Sofia Souza</div>
 
-  <!-- Three.js e utilitários (CDN) -->
+  <!-- CDN scripts -->
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://unpkg.com/three@0.152.2/examples/js/exporters/GLTFExporter.js"></script>
 
   <script>
-    // --- Setup básico ---
     const container = document.getElementById('viewer');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0d10);
+    scene.background = new THREE.Color(0x111111);
 
-    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth/container.clientHeight, 0.1, 1000);
     camera.position.set(8, 8, 10);
 
-    const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+    const renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    // Controls
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.12;
 
-    // Lights
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x666666, 0.9);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.9);
     scene.add(hemi);
+
     const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(6, 12, 8);
-    dir.castShadow = true;
+    dir.position.set(5,10,7);
     scene.add(dir);
 
-    // Grid (sutil)
     const grid = new THREE.GridHelper(40, 40, 0x222222, 0x222222);
-    grid.material.opacity = 0.06;
+    grid.material.opacity = 0.12;
     grid.material.transparent = true;
     scene.add(grid);
 
-    // State
     let pyramidMesh = null;
-    let edgesHelper = null;
-    let currentMaterial = 'stone';
-    let autoTour = null;
 
-    // --- Funções de criação ---
-    function createRegularPyramid(n, sideLen, height){
-      const angle = (2*Math.PI)/n;
-      const R = sideLen / (2*Math.sin(Math.PI/n)); // circumscribed radius
+    function clearPyramid() {
+      if (pyramidMesh) {
+        scene.remove(pyramidMesh);
+        pyramidMesh.geometry.dispose();
+        pyramidMesh.material.dispose();
+        pyramidMesh = null;
+      }
+    }
+
+    function createRegularPyramid(n, sideLen, height) {
+      const angle = (2 * Math.PI) / n;
+      const R = sideLen / (2 * Math.sin(Math.PI / n));
+
       const baseVerts = [];
-      for(let i=0;i<n;i++){
-        const a = i*angle + Math.PI/2;
-        baseVerts.push(new THREE.Vector3(R*Math.cos(a), 0, R*Math.sin(a)));
+      for (let i = 0; i < n; i++) {
+        const a = i * angle + Math.PI / 2;
+        const x = R * Math.cos(a);
+        const z = R * Math.sin(a);
+        baseVerts.push(new THREE.Vector3(x, 0, z));
       }
-      const apex = new THREE.Vector3(0, height, 0);
 
+      const apex = new THREE.Vector3(0, height, 0);
       const positions = [];
-      // faces laterais
-      for(let i=0;i<n;i++){
+
+      for (let i = 0; i < n; i++) {
         const a = baseVerts[i];
-        const b = baseVerts[(i+1)%n];
-        positions.push(a.x,a.y,a.z, b.x,b.y,b.z, apex.x,apex.y,apex.z);
+        const b = baseVerts[(i + 1) % n];
+        positions.push(a.x, a.y, a.z);
+        positions.push(b.x, b.y, b.z);
+        positions.push(apex.x, apex.y, apex.z);
       }
-      // base (fan)
-      for(let i=1;i<n-1;i++){
+
+      for (let i = 1; i < n - 1; i++) {
         const a = baseVerts[0];
         const b = baseVerts[i];
-        const c = baseVerts[i+1];
-        positions.push(a.x,a.y,a.z, c.x,c.y,c.z, b.x,b.y,b.z);
+        const c = baseVerts[i + 1];
+        positions.push(a.x, a.y, a.z);
+        positions.push(c.x, c.y, c.z);
+        positions.push(b.x, b.y, b.z);
       }
 
       const geom = new THREE.BufferGeometry();
@@ -277,238 +253,13 @@
       return geom;
     }
 
-    function makeMaterial(kind){
-      if(kind === 'stone'){
-        return new THREE.MeshStandardMaterial({
-          color: 0xbfa383,
-          roughness: 0.8,
-          metalness: 0.05,
-          side: THREE.DoubleSide
-        });
-      } else if(kind === 'ceramic'){
-        return new THREE.MeshStandardMaterial({
-          color: 0x3d5a80,
-          roughness: 0.45,
-          metalness: 0.05,
-          side: THREE.DoubleSide
-        });
-      } else if(kind === 'metal'){
-        return new THREE.MeshStandardMaterial({
-          color: 0xd4af37,
-          roughness: 0.22,
-          metalness: 0.85,
-          side: THREE.DoubleSide
-        });
-      } else {
-        return new THREE.MeshStandardMaterial({color:0x3d5a80, roughness:0.5, metalness:0.1});
-      }
-    }
-
-    function clearPyramid(){
-      if(pyramidMesh){
-        scene.remove(pyramidMesh);
-        try{ pyramidMesh.geometry.dispose(); }catch(e){}
-        try{ pyramidMesh.material.dispose(); }catch(e){}
-        pyramidMesh = null;
-      }
-      if(edgesHelper){
-        scene.remove(edgesHelper);
-        try{ edgesHelper.geometry.dispose(); }catch(e){}
-        edgesHelper = null;
-      }
-    }
-
-    // --- Métricas e fórmulas ---
-    function computeMetrics(n,l,h){
-      const P = n*l;
-      const ap = l / (2*Math.tan(Math.PI/n));
-      const Ab = (P * ap) / 2;
-      const R = l / (2*Math.sin(Math.PI/n));
-      const a1 = Math.sqrt(R*R + h*h);
-      const AL = (P * a1) / 2;
-      const AT = Ab + AL;
-      const V = (Ab * h) / 3;
-
-      // Display
-      document.getElementById('mPerimeter').innerText = `Perímetro: ${P.toFixed(3)} cm`;
-      document.getElementById('mAreaBase').innerText = `Área da base: ${Ab.toFixed(3)} cm²`;
-      document.getElementById('mAreaLat').innerText = `Área lateral: ${AL.toFixed(3)} cm²`;
-      document.getElementById('mAreaTotal').innerText = `Área total: ${AT.toFixed(3)} cm²`;
-      document.getElementById('mVolume').innerText = `Volume: ${V.toFixed(3)} cm³`;
-
-      // Fórmulas com valores
-      document.getElementById('formulaPer').innerText = `Perímetro: P = n · l = ${n} · ${l} = ${P.toFixed(3)} cm`;
-      document.getElementById('formulaAp').innerText = `Apótema da base: a = l / (2·tan(π/n)) = ${l} / (2·tan(π/${n})) = ${ap.toFixed(3)} cm`;
-      document.getElementById('formulaAb').innerText = `Área base: Ab = (P · a)/2 = (${P.toFixed(3)} · ${ap.toFixed(3)}) / 2 = ${Ab.toFixed(3)} cm²`;
-      document.getElementById('formulaAl').innerText = `Apótema lateral (a₁): a₁ = √(r² + h²) com r = ${R.toFixed(3)} → a₁ = √(${R.toFixed(3)}² + ${h}²) = ${a1.toFixed(3)} cm`;
-      document.getElementById('formulaV').innerText = `Volume: V = (Ab · h)/3 = (${Ab.toFixed(3)} · ${h})/3 = ${V.toFixed(3)} cm³`;
-    }
-
-    // --- Build & update ---
-    function buildPyramid(){
-      const n = parseInt(document.getElementById('sides').value) || 4;
-      const sideLen = parseFloat(document.getElementById('sideLen').value) || 4;
-      const height = parseFloat(document.getElementById('height').value) || 6;
+    function buildPyramid() {
+      const n = parseInt(document.getElementById('sides').value);
+      const sideLen = parseFloat(document.getElementById('sideLen').value) || 2;
+      const height = parseFloat(document.getElementById('height').value) || 3;
+      const color = document.getElementById('color').value;
 
       clearPyramid();
-      const geom = createRegularPyramid(n, sideLen, height);
-      const mat = makeMaterial(currentMaterial);
-      pyramidMesh = new THREE.Mesh(geom, mat);
-      pyramidMesh.castShadow = true;
-      pyramidMesh.receiveShadow = true;
-      scene.add(pyramidMesh);
 
-      // edges (hidden by default)
-      edgesHelper = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geom),
-        new THREE.LineBasicMaterial({ color: 0x091224, linewidth: 1 })
-      );
-      edgesHelper.visible = false;
-      scene.add(edgesHelper);
-
-      // Ajusta câmera para enquadrar
-      const bbox = new THREE.Box3().setFromObject(pyramidMesh);
-      const size = bbox.getSize(new THREE.Vector3());
-      const center = bbox.getCenter(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const fitDistance = maxDim * 1.6 + 4;
-      camera.position.set(center.x + fitDistance, center.y + fitDistance, center.z + fitDistance);
-      controls.target.copy(center);
-      controls.update();
-
-      computeMetrics(n, sideLen, height);
-    }
-
-    // --- Exports GLB ---
-    document.getElementById('download').addEventListener('click', ()=>{
-      if(!pyramidMesh){ alert('Gere a pirâmide antes de exportar.'); return; }
-      const exporter = new THREE.GLTFExporter();
-      exporter.parse(pyramidMesh, (result)=>{
-        if(result instanceof ArrayBuffer){
-          saveArrayBuffer(result, `piramide_${Date.now()}.glb`);
-        } else {
-          const str = JSON.stringify(result);
-          saveArrayBuffer(new TextEncoder().encode(str), `piramide_${Date.now()}.glb`);
-        }
-      }, { binary:true });
-    });
-
-    function saveArrayBuffer(buffer, filename){
-      const blob = new Blob([buffer], {type:'application/octet-stream'});
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(()=>{ URL.revokeObjectURL(link.href); link.remove(); }, 200);
-    }
-
-    // --- UI bindings ---
-    document.getElementById('sides').addEventListener('change', buildPyramid);
-    document.getElementById('sideLen').addEventListener('input', buildPyramid);
-    document.getElementById('height').addEventListener('input', buildPyramid);
-
-    // material buttons
-    document.getElementById('matSeg').addEventListener('click', (ev)=>{
-      const b = ev.target.closest('button');
-      if(!b) return;
-      document.querySelectorAll('#matSeg button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      currentMaterial = b.dataset.mat || 'stone';
-      buildPyramid();
-    });
-
-    // view buttons
-    document.getElementById('btnFront').addEventListener('click', ()=>{
-      camera.position.set(0, 2, 12);
-      controls.target.set(0,0,0);
-      controls.update();
-    });
-    document.getElementById('btnTop').addEventListener('click', ()=>{
-      camera.position.set(0, 18, 0.01);
-      controls.target.set(0,0,0);
-      controls.update();
-    });
-    document.getElementById('btnIso').addEventListener('click', ()=>{
-      camera.position.set(12, 12, 12);
-      controls.target.set(0,0,0);
-      controls.update();
-    });
-
-    // auto-tour
-    const tourStatus = document.getElementById('tourStatus');
-    document.getElementById('btnAuto').addEventListener('click', ()=>{
-      if(autoTour){ stopTour(); }
-      else { startTour(); }
-    });
-
-    function startTour(){
-      const center = controls.target.clone();
-      const radius = camera.position.distanceTo(center);
-      let t = 0;
-      autoTour = function(){
-        t += 0.005;
-        const x = center.x + radius * Math.cos(t);
-        const z = center.z + radius * Math.sin(t);
-        camera.position.set(x, camera.position.y, z);
-        controls.update();
-      };
-      tourStatus.innerText = 'Tour: ON';
-    }
-    function stopTour(){
-      autoTour = null;
-      tourStatus.innerText = 'Tour: OFF';
-    }
-
-    // edges
-    document.getElementById('toggleEdges').addEventListener('click', ()=>{
-      if(!edgesHelper) return;
-      edgesHelper.visible = !edgesHelper.visible;
-      document.getElementById('toggleEdges').innerText = edgesHelper.visible ? 'Arestas: ON' : 'Destacar arestas';
-    });
-
-    // theme toggle
-    const themeBtn = document.getElementById('toggleTheme');
-    themeBtn.addEventListener('click', ()=>{
-      const body = document.body;
-      const cur = body.getAttribute('data-theme') || 'light';
-      const next = (cur === 'light') ? 'dark' : 'light';
-      body.setAttribute('data-theme', next);
-      themeBtn.innerText = next === 'dark' ? 'Modo Claro' : 'Modo Escuro';
-      // update viewer background for contrast
-      if(next === 'dark'){
-        scene.background.set(0x07080b);
-      } else {
-        scene.background.set(0x111216);
-      }
-    });
-
-    // --- Render loop ---
-    function animate(){
-      requestAnimationFrame(animate);
-      if(autoTour) autoTour();
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    // responsiveness
-    window.addEventListener('resize', ()=>{
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-    });
-
-    // init
-    buildPyramid();
-
-    // accessibility: keyboard quick actions
-    window.addEventListener('keydown', (e)=>{
-      if(e.key === '1') document.getElementById('btnFront').click();
-      if(e.key === '2') document.getElementById('btnTop').click();
-      if(e.key === '3') document.getElementById('btnIso').click();
-      if(e.key === 't') document.getElementById('btnAuto').click();
-    });
-  </script>
-</body>
-</html>
+      const geom = createRegularPyramid(n, sideLen,
+      
