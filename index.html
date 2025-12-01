@@ -2,30 +2,29 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pirâmide 3D - Diagnóstico Integrado</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Pirâmide 3D — Versão Ultra Mobile</title>
 
     <style>
         body {
             margin: 0;
-            overflow: hidden;
             background: #000;
+            overflow: hidden;
             font-family: Arial, sans-serif;
             color: white;
         }
 
         #errorBox {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background: rgba(255, 0, 0, 0.85);
-            color: white;
+            background: rgba(255, 0, 0, 0.9);
             padding: 10px;
             font-size: 14px;
             display: none;
             white-space: pre-wrap;
-            z-index: 9999;
+            z-index: 99999;
         }
 
         #loading {
@@ -33,20 +32,18 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 20px;
-            color: white;
+            font-size: 22px;
+            color: #fff;
         }
     </style>
 </head>
 
 <body>
     <div id="errorBox"></div>
-    <div id="loading">Carregando cena 3D...</div>
+    <div id="loading">Carregando modelo 3D...</div>
 
-    <!-- THREE.JS VIA CDN -->
+    <!-- THREE JS + ORBIT CONTROLS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
-    <!-- ORBIT CONTROLS VIA CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
 
     <!-- SISTEMA DE DIAGNÓSTICO -->
@@ -56,88 +53,154 @@
             box.style.display = "block";
 
             box.textContent =
-                "ERRO DETECTADO:\n\n" +
+                "⚠️ ERRO DETECTADO\n\n" +
                 "Mensagem: " + msg + "\n" +
                 "Arquivo: " + url + "\n" +
                 "Linha: " + line + "\n" +
                 "Coluna: " + col + "\n" +
-                "Detalhes: " + (error ? error.stack : "n/d");
+                "Stack:\n" + (error ? error.stack : "n/d");
 
-            console.error("Erro capturado:", msg, url, line, col, error);
+            console.error("[ERRO]", msg);
         };
     </script>
 
-    <!-- CENA 3D -->
+    <!-- CENA 3D COMPLETA -->
     <script>
         try {
-            //-------------------------
-            // 1. Renderer
-            //-------------------------
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+            //--------------------------------
+            // 1. TESTE DE WEBGL
+            //--------------------------------
+            const canvasTest = document.createElement("canvas");
+            let gl = canvasTest.getContext("webgl") || canvasTest.getContext("experimental-webgl");
+
+            if (!gl) {
+                throw new Error("Seu dispositivo não suporta WebGL.");
+            }
+
+            //--------------------------------
+            // 2. RENDERER
+            //--------------------------------
+            const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            //-------------------------
-            // 2. Cena
-            //-------------------------
+            //--------------------------------
+            // 3. CENA E CÂMERA
+            //--------------------------------
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111111);
+            scene.background = new THREE.Color(0x121212);
 
-            //-------------------------
-            // 3. Câmera
-            //-------------------------
             const camera = new THREE.PerspectiveCamera(
-                60,
+                55,
                 window.innerWidth / window.innerHeight,
                 0.1,
-                1000
+                2000
             );
-            camera.position.set(3, 3, 3);
+            camera.position.set(4, 4, 4);
 
-            //-------------------------
-            // 4. Luz
-            //-------------------------
-            const light = new THREE.PointLight(0xffffff, 2);
-            light.position.set(5, 5, 5);
-            scene.add(light);
+            //--------------------------------
+            // 4. LUZES
+            //--------------------------------
+            scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-            scene.add(ambient);
+            const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+            dir.position.set(5, 10, 7);
+            scene.add(dir);
 
-            //-------------------------
-            // 5. Controles
-            //-------------------------
+            //--------------------------------
+            // 5. CONTROLES
+            //--------------------------------
             const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
 
-            //-------------------------
-            // 6. Criar Pirâmide
-            //-------------------------
-            const geometry = new THREE.ConeGeometry(1, 1.5, 4);
+            //--------------------------------
+            // 6. FUNÇÃO REAL DE PIRÂMIDE
+            //--------------------------------
+            function createPyramid(n = 4, side = 1, height = 1.5) {
+                const angle = (2 * Math.PI) / n;
+                const R = side / (2 * Math.sin(Math.PI / n));
+
+                const positions = [];
+                const base = [];
+
+                for (let i = 0; i < n; i++) {
+                    const a = i * angle;
+                    base.push(new THREE.Vector3(
+                        Math.cos(a) * R,
+                        0,
+                        Math.sin(a) * R
+                    ));
+                }
+
+                const apex = new THREE.Vector3(0, height, 0);
+
+                for (let i = 0; i < n; i++) {
+                    const a = base[i];
+                    const b = base[(i + 1) % n];
+
+                    positions.push(
+                        a.x, a.y, a.z,
+                        b.x, b.y, b.z,
+                        apex.x, apex.y, apex.z
+                    );
+                }
+
+                for (let i = 1; i < n - 1; i++) {
+                    const a = base[0];
+                    const b = base[i];
+                    const c = base[i + 1];
+
+                    positions.push(
+                        a.x, a.y, a.z,
+                        c.x, c.y, c.z,
+                        b.x, b.y, b.z
+                    );
+                }
+
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+                geom.computeVertexNormals();
+                return geom;
+            }
+
+            //--------------------------------
+            // 7. OBJETO
+            //--------------------------------
             const material = new THREE.MeshStandardMaterial({
-                color: 0xffdd33,
-                metalness: 0.3,
-                roughness: 0.6,
+                color: 0xffc930,
+                metalness: 0.2,
+                roughness: 0.5,
+                side: THREE.DoubleSide
             });
 
-            const pyramid = new THREE.Mesh(geometry, material);
-            scene.add(pyramid);
+            const mesh = new THREE.Mesh(createPyramid(5, 1.3, 1.8), material);
+            scene.add(mesh);
 
-            //-------------------------
-            // 7. Resize automático
-            //-------------------------
-            window.addEventListener("resize", () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
+            //--------------------------------
+            // 8. RESIZE COMPLETO MOBILE
+            //--------------------------------
+            function resize() {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
                 camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+            }
 
-            //-------------------------
-            // 8. Loop de animação
-            //-------------------------
+            window.addEventListener("resize", resize);
+
+            //--------------------------------
+            // 9. LOOP DE ANIMAÇÃO
+            //--------------------------------
             function animate() {
                 requestAnimationFrame(animate);
 
-                pyramid.rotation.y += 0.01;
+                mesh.rotation.y += 0.005;
+                controls.update();
                 renderer.render(scene, camera);
             }
 
@@ -146,8 +209,9 @@
             document.getElementById("loading").style.display = "none";
 
         } catch (error) {
-            window.onerror(error.message, "script", 0, 0, error);
+            window.onerror(error.message, "main", 0, 0, error);
         }
     </script>
+
 </body>
 </html>
