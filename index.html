@@ -1,87 +1,85 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pirâmide 3D - Diagnóstico Integrado</title>
+    <title>Cena 3D</title>
+
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: Arial, sans-serif; color: white; }
-        #errorBox { position: absolute; top: 0; left: 0; width: 100%; background: rgba(255, 0, 0, 0.85); color: white;
-            padding: 10px; font-size: 14px; display: none; white-space: pre-wrap; z-index: 9999; }
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; color: white; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 22px;
+        }
+        #errorBox {
+            background: red;
+            color: white;
+            padding: 15px;
+            font-size: 16px;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
-    <div id="errorBox"></div>
-    <div id="loading">Carregando cena 3D...</div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
-    <script>
-        window.onerror = function (msg, url, line, col, error) {
-            const box = document.getElementById("errorBox");
-            box.style.display = "block";
-            box.textContent =
-                "ERRO DETECTADO:\n\n" +
-                "Mensagem: " + msg + "\n" +
-                "Arquivo: " + url + "\n" +
-                "Linha: " + line + "\n" +
-                "Coluna: " + col + "\n" +
-                "Detalhes: " + (error ? error.stack : "n/d");
-            console.error("Erro capturado:", msg, url, line, col, error);
-        };
-    </script>
-    <script>
-        try {
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
 
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111111);
+<div id="errorBox"></div>
+<div id="loading">Carregando cena 3D...</div>
 
-            const camera = new THREE.PerspectiveCamera(
-                60,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                1000
-            );
-            camera.position.set(3, 3, 3);
+<!-- 🔥 TUDO AQUI DENTRO É MÓDULO -->
+<script type="module">
+    import * as THREE from "https://unpkg.com/three@0.162.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.162.0/examples/jsm/controls/OrbitControls.js";
 
-            const light = new THREE.PointLight(0xffffff, 2);
-            light.position.set(5, 5, 5);
-            scene.add(light);
+    try {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-            scene.add(ambient);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
 
-            const geometry = new THREE.ConeGeometry(1, 1.5, 4);
-            const material = new THREE.MeshStandardMaterial({
-                color: 0xffdd33,
-                metalness: 0.3,
-                roughness: 0.6,
-            });
-            const pyramid = new THREE.Mesh(geometry, material);
-            scene.add(pyramid);
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
 
-            window.addEventListener("resize", () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
 
-            function animate() {
-                requestAnimationFrame(animate);
-                pyramid.rotation.y += 0.01;
-                renderer.render(scene, camera);
-            }
-            animate();
+        camera.position.z = 3;
 
-            document.getElementById("loading").style.display = "none";
-        } catch (error) {
-            window.onerror(error.message, "script", 0, 0, error);
+        document.getElementById("loading").style.display = "none";
+
+        function animate() {
+            requestAnimationFrame(animate);
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+            renderer.render(scene, camera);
         }
-    </script>
+        animate();
+
+    } catch (err) {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.innerHTML = `
+            <b>ERRO DETECTADO:</b><br><br>
+            ${err}
+        `;
+    }
+</script>
+
 </body>
 </html>
