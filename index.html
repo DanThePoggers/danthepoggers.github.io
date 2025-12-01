@@ -1,95 +1,66 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teste Three.js</title>
+    <title>ThreeJS Test</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: black;
-        }
-        #erro {
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #diag {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 100%;
-            padding: 10px;
             background: red;
             color: white;
-            font-family: monospace;
+            padding: 8px;
+            font-size: 14px;
             display: none;
-            z-index: 9999;
         }
     </style>
 </head>
 <body>
+    <div id="diag"></div>
 
-<div id="erro"></div>
+    <script type="module">
+        // Diagnóstico
+        function diag(msg) {
+            const d = document.getElementById("diag");
+            d.style.display = "block";
+            d.innerText = msg;
+        }
 
-<script type="module">
-    const mostrarErro = (msg) => {
-        const e = document.getElementById("erro");
-        e.innerText = msg;
-        e.style.display = "block";
-    };
+        // Teste inicial
+        diag("Carregando Three.js...");
 
-    try {
-        // Import CERTINHO — versão estável e existente
-        import * as THREE from "https://unpkg.com/three@0.162.0/build/three.module.js";
+        // IMPORTA THREE.JS COMO MÓDULO (FUNCIONA EM GITHUB PAGES)
+        import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
-        // Como import() dentro de script module é assíncrono:
-        (async () => {
-            const THREE = await import("https://unpkg.com/three@0.162.0/build/three.module.js");
+        diag("Three.js carregado! Inicializando cena...");
 
-            // Cena
-            const scene = new THREE.Scene();
+        // Cena
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-            // Câmera
-            const camera = new THREE.PerspectiveCamera(
-                75,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                1000
-            );
+        // Cubo
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
 
-            // Renderizador
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+        camera.position.z = 3;
 
-            // Cubo
-            const geometry = new THREE.BoxGeometry();
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const cube = new THREE.Mesh(geometry, material);
-            scene.add(cube);
+        function animate() {
+            requestAnimationFrame(animate);
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+            renderer.render(scene, camera);
+        }
 
-            camera.position.z = 3;
-
-            // Loop de animação
-            function animate() {
-                requestAnimationFrame(animate);
-
-                cube.rotation.x += 0.01;
-                cube.rotation.y += 0.01;
-
-                renderer.render(scene, camera);
-            }
-            animate();
-
-            // Ajuste quando redimensiona tela
-            window.addEventListener("resize", () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        })();
-
-    } catch (err) {
-        mostrarErro("Erro ao carregar Three.js: " + err);
-    }
-</script>
-
+        animate();
+    </script>
 </body>
 </html>
