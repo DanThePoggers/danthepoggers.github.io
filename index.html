@@ -1,57 +1,67 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ThreeJS Test</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cena 3D</title>
+
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-        #diag {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 22px;
+        }
+        #errorBox {
             background: red;
             color: white;
-            padding: 8px;
-            font-size: 14px;
+            padding: 15px;
+            font-size: 16px;
             display: none;
         }
     </style>
 </head>
+
 <body>
-    <div id="diag"></div>
 
-    <script type="module">
-        // Diagnóstico
-        function diag(msg) {
-            const d = document.getElementById("diag");
-            d.style.display = "block";
-            d.innerText = msg;
-        }
+<div id="errorBox"></div>
+<div id="loading">Carregando cena 3D...</div>
 
-        // Teste inicial
-        diag("Carregando Three.js...");
+<!-- 🔥 TUDO AQUI DENTRO É MÓDULO -->
+<script type="module">
+    import * as THREE from "https://unpkg.com/three@0.162.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.162.0/examples/jsm/controls/OrbitControls.js";
 
-        // IMPORTA THREE.JS COMO MÓDULO (FUNCIONA EM GITHUB PAGES)
-        import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-
-        diag("Three.js carregado! Inicializando cena...");
-
-        // Cena
+    try {
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+        const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Cubo
+        const controls = new OrbitControls(camera, renderer.domElement);
+
         const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
         const cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
 
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+
         camera.position.z = 3;
+
+        document.getElementById("loading").style.display = "none";
 
         function animate() {
             requestAnimationFrame(animate);
@@ -59,8 +69,17 @@
             cube.rotation.y += 0.01;
             renderer.render(scene, camera);
         }
-
         animate();
-    </script>
+
+    } catch (err) {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.innerHTML = `
+            <b>ERRO DETECTADO:</b><br><br>
+            ${err}
+        `;
+    }
+</script>
+
 </body>
 </html>
