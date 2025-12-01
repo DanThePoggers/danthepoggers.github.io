@@ -1,496 +1,60 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pirâmide — Mini Motor WebGL Avançado (único arquivo)</title>
+<meta charset="UTF-8">
+<title>Pirâmide 3D – Motor WebGL Próprio</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
 <style>
-  :root{--ui-bg:rgba(0,0,0,0.5);--accent:#0b5;color-scheme:dark}
-  html,body{height:100%;margin:0;background:#0b0b0d;color:#eee;font-family:Inter,Arial,Helvetica,sans-serif}
-  #app{height:100vh;display:flex;flex-direction:column}
-  header{padding:10px 12px;background:linear-gradient(90deg,#062,#036);color:#001;font-weight:700}
-  #stage{flex:1;position:relative;overflow:hidden}
-  canvas{display:block;width:100%;height:100%;touch-action:none}
-  #ui{position:absolute;left:12px;top:12px;background:var(--ui-bg);backdrop-filter:blur(4px);padding:10px;border-radius:10px;z-index:50}
-  #ui *{display:block;margin:6px 0;font-size:13px}
-  select,input[type=range]{width:160px}
-  button{background:var(--accent);color:#001;border:0;padding:8px;border-radius:8px;cursor:pointer}
-  #status{position:absolute;right:12px;top:12px;background:rgba(0,0,0,0.45);padding:8px;border-radius:8px;font-size:13px}
-  label.small{font-size:12px;opacity:.85}
-  footer{padding:8px 12px;font-size:12px;color:#aaa;background:linear-gradient(180deg,#0000,#0008)}
+    body {
+        margin: 0;
+        background: #111;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+    }
+
+    #ui {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.6);
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        max-width: 300px;
+        z-index: 10;
+    }
+
+    label { display: block; margin-top: 8px; }
+    input, select { width: 100%; padding: 4px; margin-top: 4px; }
+
+    #metrics {
+        margin-top: 10px;
+        background: rgba(255,255,255,0.08);
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+
+    canvas { width: 100vw; height: 100vh; display: block; }
 </style>
+
 </head>
 <body>
-<div id="app">
-  <header>Pirâmide 3D — Motor WebGL (touch & mobile)</header>
-  <div id="stage">
-    <canvas id="gl"></canvas>
 
-    <div id="ui" aria-hidden="false">
-      <label class="small">Modelo
-        <select id="modelSelect">
-          <option value="pyramid">Pirâmide Regular</option>
-          <option value="custom">Custom — Estrela 3D</option>
+<canvas id="glcanvas"></canvas>
+
+<div id="ui">
+    <label>Base (n lados)
+        <select id="sides">
+            <option value="3">Triângulo</option>
+            <option value="4" selected>Quadrado</option>
+            <option value="5">Pentágono</option>
+            <option value="6">Hexágono</option>
         </select>
-      </label>
+    </label>
 
-      <label class="small">Lados da base
-        <input id="nSides" type="number" min="3" max="12" value="4">
-      </label>
-
-      <label class="small">Altura
-        <input id="height" type="number" step="0.1" min="0.2" value="1.6">
-      </label>
-
-      <label class="small">Textura
-        <select id="texSelect">
-          <option value="strip">Listras</option>
-          <option value="grid">Grid</option>
-          <option value="stone">Pedra</option>
-          <option value="none">Sem textura (cor)</option>
-        </select>
-      </label>
-
-      <label class="small">Auto rotate
-        <input id="autoRotate" type="checkbox" checked>
-      </label>
-
-      <label class="small">Bounce animation
-        <input id="bounce" type="checkbox">
-      </label>
-
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <button id="rebuild">Atualizar</button>
-        <button id="exportObj">Exportar OBJ</button>
-      </div>
-
-      <small style="display:block;margin-top:6px;opacity:.8">Arraste para rotacionar • Pinça para zoom • Dois dedos para zoom</small>
-    </div>
-
-    <div id="status">Zoom: <span id="zoomVal">1.00</span></div>
-  </div>
-
-  <footer>Mini Motor WebGL — Embutido | Sem CDN</footer>
-</div>
-
-<script>
-/* ========= Mini Motor WebGL Avançado =========
-   - Tudo num único arquivo
-   - Procedural texture via canvas
-   - Touch: pointer events + pinch zoom
-   - Model builder: pirâmide regular e custom
-   - Shader: iluminação PBR-lite (diffuse + specular + rim)
-   - Export OBJ (text) para download
-=============================================*/
-
-// --- Utility math (small) ---
-const vec3 = {
-  cross: (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
-  sub: (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]],
-  normalize: (v) => { const l=Math.hypot(v[0],v[1],v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; },
-  dot: (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2]
-};
-
-function mat4Identity(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
-function mat4Mul(a,b){
-  const o=new Float32Array(16);
-  for(let i=0;i<4;i++) for(let j=0;j<4;j++){
-    let s=0; for(let k=0;k<4;k++) s+=a[i*4+k]*b[k*4+j]; o[i*4+j]=s;
-  }
-  return o;
-}
-function mat4Perspective(fovy, aspect, near, far){
-  const f=1/Math.tan(fovy/2), nf=1/(near-far);
-  const out=new Float32Array(16);
-  out[0]=f/aspect; out[5]=f; out[10]=(far+near)*nf; out[11]=-1; out[14]=(2*far*near)*nf; return out;
-}
-function mat4Translate(tx,ty,tz){ const m=mat4Identity(); m[12]=tx; m[13]=ty; m[14]=tz; return m; }
-function mat4RotateX(a){ const c=Math.cos(a), s=Math.sin(a); const m=mat4Identity(); m[5]=c; m[6]=s; m[9]=-s; m[10]=c; return m; }
-function mat4RotateY(a){ const c=Math.cos(a), s=Math.sin(a); const m=mat4Identity(); m[0]=c; m[2]=-s; m[8]=s; m[10]=c; return m; }
-function mat4Scale(sx,sy,sz){ const m=mat4Identity(); m[0]=sx; m[5]=sy; m[10]=sz; return m; }
-
-// --- GL setup ---
-const canvas = document.getElementById('gl');
-const gl = canvas.getContext('webgl', {antialias:true});
-if(!gl) { alert('WebGL não suportado'); throw new Error('WebGL not supported'); }
-function resize(){
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.floor(w * dpr);
-  canvas.height = Math.floor(h * dpr);
-  gl.viewport(0,0,canvas.width,canvas.height);
-}
-window.addEventListener('resize', resize);
-resize();
-
-// --- SHADERS (standard phong-like + texture) ---
-const vs = `
-attribute vec3 aPos;
-attribute vec3 aNormal;
-attribute vec2 aUV;
-uniform mat4 uMVP;
-uniform mat4 uModel;
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec2 vUV;
-void main(){
-  vNormal = mat3(uModel) * aNormal;
-  vPos = (uModel * vec4(aPos,1.0)).xyz;
-  vUV = aUV;
-  gl_Position = uMVP * vec4(aPos,1.0);
-}
-`;
-const fs = `
-precision mediump float;
-varying vec3 vNormal;
-varying vec3 vPos;
-varying vec2 vUV;
-uniform vec3 uLightDir;
-uniform vec3 uColor;
-uniform sampler2D uTex;
-uniform float uHasTex;
-void main(){
-  vec3 N = normalize(vNormal);
-  vec3 L = normalize(uLightDir);
-  float diff = max(dot(N,L), 0.0);
-  vec3 view = normalize(-vPos);
-  vec3 H = normalize(L + view);
-  float spec = pow(max(dot(N,H),0.0), 24.0);
-  vec3 base = uColor;
-  if(uHasTex>0.5){
-    vec3 t = texture2D(uTex, vUV).rgb;
-    base *= t;
-  }
-  float ambient = 0.15;
-  vec3 col = base * (ambient + 0.85*diff) + spec*vec3(0.9);
-  // rim
-  float rim = pow(1.0 - max(dot(N, view),0.0), 2.0);
-  col += 0.06 * rim;
-  gl_FragColor = vec4(col,1.0);
-}
-`;
-
-// compile helpers
-function compile(src, type){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-function createProgram(vsSrc, fsSrc){ const p = gl.createProgram(); gl.attachShader(p, compile(vsSrc,gl.VERTEX_SHADER)); gl.attachShader(p, compile(fsSrc,gl.FRAGMENT_SHADER)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; }
-
-const program = createProgram(vs,fs);
-gl.useProgram(program);
-
-// locations
-const ATTR = { pos: gl.getAttribLocation(program,'aPos'), normal: gl.getAttribLocation(program,'aNormal'), uv: gl.getAttribLocation(program,'aUV') };
-const UNI = { mvp: gl.getUniformLocation(program,'uMVP'), model: gl.getUniformLocation(program,'uModel'), lightDir: gl.getUniformLocation(program,'uLightDir'), color: gl.getUniformLocation(program,'uColor'), tex: gl.getUniformLocation(program,'uTex'), hasTex: gl.getUniformLocation(program,'uHasTex') };
-
-// buffers
-const posBuf = gl.createBuffer(), norBuf = gl.createBuffer(), uvBuf = gl.createBuffer(), idxBuf = gl.createBuffer();
-let idxCount = 0;
-
-// --- Geometry builders ---
-// returns {positions:Float32Array, normals:Float32Array, uvs:Float32Array, indices:Uint16Array}
-function buildPyramid(nSides=4, sideLen=1.6, height=1.6){
-  const R = sideLen / (2*Math.sin(Math.PI/nSides));
-  const base = [];
-  for(let i=0;i<nSides;i++){ const a=i*(2*Math.PI)/nSides + Math.PI/2; base.push([R*Math.cos(a),0,R*Math.sin(a)]); }
-  const apex = [0,height,0];
-  const pos = [], nor=[], uv=[], idx=[];
-  let vi=0;
-  // lateral faces
-  for(let i=0;i<nSides;i++){
-    const a = base[i], b = base[(i+1)%nSides];
-    pos.push(...a, ...b, ...apex);
-    const nrm = triNormal(a,b,apex);
-    nor.push(...nrm, ...nrm, ...nrm);
-    // simple UVs
-    uv.push(0,0, 1,0, 0.5,1);
-    idx.push(vi,vi+1,vi+2); vi+=3;
-  }
-  // base fan (winding so normal faces down)
-  for(let i=1;i<nSides-1;i++){
-    const a = base[0], b = base[i+1], c = base[i];
-    pos.push(...a, ...b, ...c);
-    let nrm = triNormal(a,b,c); if(nrm[1]>0) nrm = nrm.map(v=>-v);
-    nor.push(...nrm,...nrm,...nrm);
-    uv.push(0.5,0.5, 1,0, 0,0);
-    idx.push(vi,vi+1,vi+2); vi+=3;
-  }
-  return {positions:new Float32Array(pos), normals:new Float32Array(nor), uvs:new Float32Array(uv), indices:new Uint16Array(idx)};
-}
-
-function buildCustom(){ // simple star-ish extruded model
-  const pos=[], nor=[], uv=[], idx=[];
-  // create a 6-point star base and an elevated inner ring for interest
-  const n=6, R=1.1, r=0.45;
-  const basePoints=[];
-  for(let i=0;i<n;i++){ const a=i*(2*Math.PI)/n; basePoints.push([Math.cos(a)*R,0,Math.sin(a)*R]); }
-  const inner=[];
-  for(let i=0;i<n;i++){ const a=i*(2*Math.PI)/n + Math.PI/n; inner.push([Math.cos(a)*r,0.8,Math.sin(a)*r]); }
-  let vi=0;
-  for(let i=0;i<n;i++){
-    const a=basePoints[i], b=basePoints[(i+1)%n], c=inner[i];
-    pos.push(...a,...b,...c); const nrm=triNormal(a,b,c); nor.push(...nrm,...nrm,...nrm); uv.push(0,0,1,0,0.5,1); idx.push(vi,vi+1,vi+2); vi+=3;
-    const d = inner[i], e = inner[(i+1)%n], f = basePoints[(i+1)%n];
-    pos.push(...d,...e,...f); const nrm2=triNormal(d,e,f); nor.push(...nrm2,...nrm2,...nrm2); uv.push(0,0,1,0,0.5,1); idx.push(vi,vi+1,vi+2); vi+=3;
-  }
-  return {positions:new Float32Array(pos), normals:new Float32Array(nor), uvs:new Float32Array(uv), indices:new Uint16Array(idx)};
-}
-
-function triNormal(a,b,c){
-  const ux=b[0]-a[0], uy=b[1]-a[1], uz=b[2]-a[2];
-  const vx=c[0]-a[0], vy=c[1]-a[1], vz=c[2]-a[2];
-  const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
-  const l = Math.hypot(nx,ny,nz) || 1; return [nx/l, ny/l, nz/l];
-}
-
-// --- Upload geometry ---
-function uploadGeom(geom){
-  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.positions, gl.STATIC_DRAW);
-  gl.vertexAttribPointer(ATTR.pos, 3, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(ATTR.pos);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, norBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.normals, gl.STATIC_DRAW);
-  gl.vertexAttribPointer(ATTR.normal, 3, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(ATTR.normal);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.uvs, gl.STATIC_DRAW);
-  gl.vertexAttribPointer(ATTR.uv, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(ATTR.uv);
-
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geom.indices, gl.STATIC_DRAW);
-  idxCount = geom.indices.length;
-}
-
-// --- Texture generation (procedural) ---
-function makeTexture(type){
-  const s = 512;
-  const c = document.createElement('canvas');
-  c.width=c.height=s;
-  const ctx=c.getContext('2d');
-  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,s,s);
-  if(type==='strip'){
-    for(let i=0;i<20;i++){ ctx.fillStyle = i%2? '#d5a48b' : '#7f5539'; ctx.fillRect(0,i*(s/20),s,s/20); }
-  } else if(type==='grid'){
-    ctx.fillStyle='#8a8a8a'; for(let i=0;i<50;i+=5){ ctx.fillRect(i*10,0,2,s); ctx.fillRect(0,i*10,s,2); }
-  } else if(type==='stone'){
-    // simple noise-ish
-    for(let y=0;y<s;y+=8) for(let x=0;x<s;x+=8){
-      const g = Math.floor(160 + (Math.random()*60));
-      ctx.fillStyle = `rgb(${g-20},${g-10},${g})`;
-      ctx.fillRect(x,y,8,8);
-    }
-    ctx.globalCompositeOperation='overlay';
-    ctx.fillStyle='rgba(0,0,0,0.05)'; ctx.fillRect(0,0,s,s);
-    ctx.globalCompositeOperation='source-over';
-  } else {
-    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,s,s);
-  }
-  return c;
-}
-
-let texGL = gl.createTexture();
-function applyTexture(type){
-  const c = makeTexture(type);
-  gl.bindTexture(gl.TEXTURE_2D, texGL);
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.generateMipmap(gl.TEXTURE_2D);
-}
-
-// --- Interaction: orbit + pinch zoom ---
-let yaw = 0, pitch = 0, distance = 3.0;
-let isPointerDown=false, lastX=0, lastY=0;
-let pointers = {}; // active pointers
-canvas.addEventListener('pointerdown', (e)=>{ canvas.setPointerCapture(e.pointerId); pointers[e.pointerId]=e; isPointerDown=true; lastX=e.clientX; lastY=e.clientY; }, {passive:false});
-canvas.addEventListener('pointermove', (e)=>{
-  if(!pointers[e.pointerId]) return;
-  pointers[e.pointerId]=e;
-  const keys = Object.keys(pointers);
-  if(keys.length===1){
-    // rotate
-    const dx = e.clientX - lastX, dy = e.clientY - lastY;
-    yaw += dx * 0.005;
-    pitch += dy * 0.005;
-    pitch = Math.max(-1.4, Math.min(1.4, pitch));
-    lastX = e.clientX; lastY = e.clientY;
-    autoRotate=false;
-  } else if(keys.length===2){
-    // pinch zoom
-    const p = Object.values(pointers);
-    const d = Math.hypot(p[0].clientX - p[1].clientX, p[0].clientY - p[1].clientY);
-    if(typeof canvas._lastPinch === 'number'){
-      const diff = d - canvas._lastPinch;
-      distance *= 1 - diff * 0.003;
-      distance = Math.max(1.0, Math.min(8.0, distance));
-    }
-    canvas._lastPinch = d;
-  }
-}, {passive:false});
-canvas.addEventListener('pointerup', (e)=>{ delete pointers[e.pointerId]; canvas._lastPinch = undefined; try{ canvas.releasePointerCapture(e.pointerId); }catch(_){} isPointerDown=false; }, {passive:false});
-canvas.addEventListener('pointercancel', (e)=>{ delete pointers[e.pointerId]; canvas._lastPinch=undefined; }, {passive:false});
-
-// mouse wheel zoom
-canvas.addEventListener('wheel', (e)=>{ distance *= 1 + e.deltaY*0.001; distance = Math.max(1, Math.min(12, distance)); e.preventDefault(); }, {passive:false});
-
-// --- Scene state & rendering ---
-let autoRotate = true, bounce=false;
-const uiAuto = document.getElementById('autoRotate'), uiBounce=document.getElementById('bounce');
-uiAuto.addEventListener('change', ()=> autoRotate = uiAuto.checked);
-uiBounce.addEventListener('change', ()=> bounce = uiBounce.checked);
-
-function setModelFromUI(){
-  const sel = document.getElementById('modelSelect').value;
-  const n = parseInt(document.getElementById('nSides').value)||4;
-  const h = parseFloat(document.getElementById('height').value)||1.6;
-  let geom = (sel==='pyramid') ? buildPyramid(n,1.6,h) : buildCustom();
-  uploadGeom(geom);
-}
-document.getElementById('rebuild').addEventListener('click', ()=>{ setModelFromUI(); });
-
-document.getElementById('modelSelect').addEventListener('change', ()=> setModelFromUI());
-document.getElementById('texSelect').addEventListener('change', ()=>{ const t=document.getElementById('texSelect').value; if(t==='none') gl.uniform1f(UNI.hasTex,0); else { applyTexture(t); gl.uniform1f(UNI.hasTex,1); } });
-
-// export OBJ (very simple)
-document.getElementById('exportObj').addEventListener('click', ()=> {
-  // read buffers back (keep it simple — assume currently uploaded data)
-  // For convenience, rebuild a textual OBJ from current geometry stored in JS by lastGeom
-  if(!lastGeom) return alert('Nenhuma geometria disponível');
-  let out = '# OBJ export\n';
-  const p = lastGeom.positions;
-  for(let i=0;i<p.length;i+=3) out += `v ${p[i]} ${p[i+1]} ${p[i+2]}\n`;
-  const n = lastGeom.normals;
-  for(let i=0;i<n.length;i+=3) out += `vn ${n[i]} ${n[i+1]} ${n[i+2]}\n`;
-  const uv = lastGeom.uvs;
-  for(let i=0;i<uv.length;i+=2) out += `vt ${uv[i]} ${uv[i+1]}\n`;
-  for(let i=0;i<lastGeom.indices.length;i+=3){
-    const a=lastGeom.indices[i]+1,b=lastGeom.indices[i+1]+1,c=lastGeom.indices[i+2]+1;
-    out += `f ${a}/${a}/${a} ${b}/${b}/${b} ${c}/${c}/${c}\n`;
-  }
-  const blob = new Blob([out], {type:'text/plain'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='model.obj'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-});
-
-// remember last geom for OBJ export
-let lastGeom = null;
-function uploadAndRemember(geom){
-  lastGeom = { positions: Array.from(geom.positions), normals: Array.from(geom.normals), uvs: Array.from(geom.uvs), indices: Array.from(geom.indices) };
-  uploadGeom(geom);
-}
-
-// initial texture and geometry
-applyTexture('strip');
-gl.uniform1i(UNI.tex, 0);
-gl.uniform1f(UNI.hasTex, 1);
-gl.uniform3f(UNI.color, 0.9,0.6,0.35);
-
-// set attribute pointers bound to buffers
-gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-gl.vertexAttribPointer(ATTR.pos,3,gl.FLOAT,false,0,0);
-gl.enableVertexAttribArray(ATTR.pos);
-gl.bindBuffer(gl.ARRAY_BUFFER, norBuf);
-gl.vertexAttribPointer(ATTR.normal,3,gl.FLOAT,false,0,0);
-gl.enableVertexAttribArray(ATTR.normal);
-gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf);
-gl.vertexAttribPointer(ATTR.uv,2,gl.FLOAT,false,0,0);
-gl.enableVertexAttribArray(ATTR.uv);
-
-// enable state
-gl.enable(gl.DEPTH_TEST);
-gl.enable(gl.CULL_FACE);
-
-// build initial
-function rebuildAll(){
-  const sel = document.getElementById('modelSelect').value;
-  const n = parseInt(document.getElementById('nSides').value)||4;
-  const h = parseFloat(document.getElementById('height').value)||1.6;
-  const geom = (sel==='pyramid') ? buildPyramid(n,1.6,h) : buildCustom();
-  uploadAndRemember(geom);
-}
-rebuildAll();
-
-// --- render loop ---
-const uLightDir = [5,8,3];
-let timeStart = performance.now();
-function render(){
-  resize();
-  gl.clearColor(0.03,0.03,0.04,1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  // projection
-  const proj = mat4Perspective(Math.PI/3, canvas.width/canvas.height, 0.01, 100);
-  // camera spherical
-  if(autoRotate) yaw += 0.002;
-  let t = (performance.now()-timeStart)/1000;
-  let bounceOffset = 0;
-  if(bounce) bounceOffset = Math.sin(t*3)*0.15;
-
-  const cx = Math.cos(yaw) * distance;
-  const cz = Math.sin(yaw) * distance;
-  const cy = Math.sin(pitch) * distance * 0.5 + 0.6 + bounceOffset;
-  const view = lookAt([cx, cy, cz], [0,0.6,0], [0,1,0]);
-
-  // model transform (rotate model a bit for nicer view)
-  const model = mat4Mul(mat4RotateX(-0.25), mat4Identity());
-
-  const mvp = mat4Mul(proj, mat4Mul(view, model));
-  gl.uniformMatrix4fv(UNI.mvp, false, mvp);
-  gl.uniformMatrix4fv(UNI.model, false, model);
-
-  // light dir (in world space)
-  gl.uniform3f(UNI.lightDir, uLightDir[0], uLightDir[1], uLightDir[2]);
-
-  // draw
-  gl.drawElements(gl.TRIANGLES, idxCount, gl.UNSIGNED_SHORT, 0);
-
-  // update UI
-  document.getElementById('zoomVal').innerText = distance.toFixed(2);
-
-  requestAnimationFrame(render);
-}
-requestAnimationFrame(render);
-
-// simple lookAt producing view matrix (inverse of camera)
-function lookAt(eye, center, up){
-  const zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
-  let zlen = Math.hypot(zx,zy,zz)||1; const zxN=zx/zlen, zyN=zy/zlen, zzN=zz/zlen;
-  let xx = up[1]*zzN - up[2]*zyN, xy = up[2]*zxN - up[0]*zzN, xz = up[0]*zyN - up[1]*zxN;
-  let xlen = Math.hypot(xx,xy,xz)||1; xx/=xlen; xy/=xlen; xz/=xlen;
-  let yx = zyN*xz - zzN*xy, yy = zzN*xx - zxN*xz, yz = zxN*xy - zyN*xx;
-  const m = new Float32Array(16);
-  m[0]=xx; m[1]=yx; m[2]=zxN; m[3]=0;
-  m[4]=xy; m[5]=yy; m[6]=zyN; m[7]=0;
-  m[8]=xz; m[9]=yz; m[10]=zzN; m[11]=0;
-  m[12]=-(xx*eye[0] + xy*eye[1] + xz*eye[2]);
-  m[13]=-(yx*eye[0] + yy*eye[1] + yz*eye[2]);
-  m[14]=-(zxN*eye[0] + zyN*eye[1] + zzN*eye[2]);
-  m[15]=1;
-  return m;
-}
-
-// update UI initial bindings
-document.getElementById('nSides').value = 4;
-document.getElementById('height').value = 1.6;
-
-// set default uniforms
-gl.uniform3f(UNI.color, 0.90, 0.55, 0.32);
-gl.uniform1f(UNI.hasTex, 1);
-
-// expose rebuild to internal use and initial enforce
-document.getElementById('rebuild').addEventListener('click', ()=>{ rebuildAll(); });
-
-// make sure UI updates trigger geometry change
-document.getElementById('nSides').addEventListener('change', ()=> rebuildAll());
-document.getElementById('height').addEventListener('change', ()=> rebuildAll());
-
-// initial apply texture (already called)
-applyTexture('strip');
-
-</script>
-</body>
-</html>
+    <label>Lado da base (cm)
+        <input id="sideLen
