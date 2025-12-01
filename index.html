@@ -4,57 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pirâmide 3D - Diagnóstico Integrado</title>
-
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #000;
-            font-family: Arial, sans-serif;
-            color: white;
-        }
-
-        #errorBox {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background: rgba(255, 0, 0, 0.85);
-            color: white;
-            padding: 10px;
-            font-size: 14px;
-            display: none;
-            white-space: pre-wrap;
-            z-index: 9999;
-        }
-
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 20px;
-            color: white;
-        }
+        body { margin: 0; overflow: hidden; background: #000; font-family: Arial, sans-serif; color: white; }
+        #errorBox { position: absolute; top: 0; left: 0; width: 100%; background: rgba(255, 0, 0, 0.85); color: white;
+            padding: 10px; font-size: 14px; display: none; white-space: pre-wrap; z-index: 9999; }
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; color: white; }
     </style>
 </head>
-
 <body>
     <div id="errorBox"></div>
     <div id="loading">Carregando cena 3D...</div>
-
-    <!-- THREE.JS VIA CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
-    <!-- ORBIT CONTROLS VIA CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
-
-    <!-- SISTEMA DE DIAGNÓSTICO -->
     <script>
         window.onerror = function (msg, url, line, col, error) {
             const box = document.getElementById("errorBox");
             box.style.display = "block";
-
             box.textContent =
                 "ERRO DETECTADO:\n\n" +
                 "Mensagem: " + msg + "\n" +
@@ -62,30 +27,18 @@
                 "Linha: " + line + "\n" +
                 "Coluna: " + col + "\n" +
                 "Detalhes: " + (error ? error.stack : "n/d");
-
             console.error("Erro capturado:", msg, url, line, col, error);
         };
     </script>
-
-    <!-- CENA 3D -->
     <script>
         try {
-            //-------------------------
-            // 1. Renderer
-            //-------------------------
             const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            //-------------------------
-            // 2. Cena
-            //-------------------------
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x111111);
 
-            //-------------------------
-            // 3. Câmera
-            //-------------------------
             const camera = new THREE.PerspectiveCamera(
                 60,
                 window.innerWidth / window.innerHeight,
@@ -94,9 +47,6 @@
             );
             camera.position.set(3, 3, 3);
 
-            //-------------------------
-            // 4. Luz
-            //-------------------------
             const light = new THREE.PointLight(0xffffff, 2);
             light.position.set(5, 5, 5);
             scene.add(light);
@@ -104,47 +54,31 @@
             const ambient = new THREE.AmbientLight(0xffffff, 0.3);
             scene.add(ambient);
 
-            //-------------------------
-            // 5. Controles
-            //-------------------------
             const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-            //-------------------------
-            // 6. Criar Pirâmide
-            //-------------------------
             const geometry = new THREE.ConeGeometry(1, 1.5, 4);
             const material = new THREE.MeshStandardMaterial({
                 color: 0xffdd33,
                 metalness: 0.3,
                 roughness: 0.6,
             });
-
             const pyramid = new THREE.Mesh(geometry, material);
             scene.add(pyramid);
 
-            //-------------------------
-            // 7. Resize automático
-            //-------------------------
             window.addEventListener("resize", () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
 
-            //-------------------------
-            // 8. Loop de animação
-            //-------------------------
             function animate() {
                 requestAnimationFrame(animate);
-
                 pyramid.rotation.y += 0.01;
                 renderer.render(scene, camera);
             }
-
             animate();
 
             document.getElementById("loading").style.display = "none";
-
         } catch (error) {
             window.onerror(error.message, "script", 0, 0, error);
         }
