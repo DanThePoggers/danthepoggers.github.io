@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <title>Pirâmide 3D — Versão Ultra Mobile</title>
+    <title>Pirâmide 3D — Ultra Mobile Fix</title>
 
     <style>
         body {
             margin: 0;
             background: #000;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: Arial;
             color: white;
         }
-
         #errorBox {
             position: fixed;
             top: 0;
@@ -21,197 +20,52 @@
             width: 100%;
             background: rgba(255, 0, 0, 0.9);
             padding: 10px;
-            font-size: 14px;
             display: none;
             white-space: pre-wrap;
             z-index: 99999;
         }
-
         #loading {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 22px;
-            color: #fff;
         }
     </style>
 </head>
 
 <body>
     <div id="errorBox"></div>
-    <div id="loading">Carregando modelo 3D...</div>
+    <div id="loading">Carregando...</div>
 
-    <!-- THREE JS + ORBIT CONTROLS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
+    <!-- ✔ Agora os scripts só rodam DEPOIS de carregar -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
 
-    <!-- SISTEMA DE DIAGNÓSTICO -->
     <script>
-        window.onerror = function (msg, url, line, col, error) {
-            const box = document.getElementById("errorBox");
-            box.style.display = "block";
-
-            box.textContent =
-                "⚠️ ERRO DETECTADO\n\n" +
-                "Mensagem: " + msg + "\n" +
-                "Arquivo: " + url + "\n" +
-                "Linha: " + line + "\n" +
-                "Coluna: " + col + "\n" +
-                "Stack:\n" + (error ? error.stack : "n/d");
-
-            console.error("[ERRO]", msg);
-        };
+    window.onerror = function(msg, url, line, col, error) {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.textContent =
+            "ERRO DETECTADO:\n" +
+            msg + "\n" +
+            (error ? error.stack : "");
+    };
     </script>
 
-    <!-- CENA 3D COMPLETA -->
+    <!-- 🚀 Código principal só roda quando TUDO carregar -->
     <script>
+    window.addEventListener("load", () => {
         try {
 
-            //--------------------------------
-            // 1. TESTE DE WEBGL
-            //--------------------------------
-            const canvasTest = document.createElement("canvas");
-            let gl = canvasTest.getContext("webgl") || canvasTest.getContext("experimental-webgl");
-
-            if (!gl) {
-                throw new Error("Seu dispositivo não suporta WebGL.");
+            if (!window.THREE) {
+                throw new Error("THREE.js NÃO carregou no dispositivo.");
             }
 
-            //--------------------------------
-            // 2. RENDERER
-            //--------------------------------
-            const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            //--------------------------------
-            // 3. CENA E CÂMERA
-            //--------------------------------
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x121212);
-
-            const camera = new THREE.PerspectiveCamera(
-                55,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                2000
-            );
-            camera.position.set(4, 4, 4);
-
-            //--------------------------------
-            // 4. LUZES
-            //--------------------------------
-            scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-
-            const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-            dir.position.set(5, 10, 7);
-            scene.add(dir);
-
-            //--------------------------------
-            // 5. CONTROLES
-            //--------------------------------
-            const controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
-
-            //--------------------------------
-            // 6. FUNÇÃO REAL DE PIRÂMIDE
-            //--------------------------------
-            function createPyramid(n = 4, side = 1, height = 1.5) {
-                const angle = (2 * Math.PI) / n;
-                const R = side / (2 * Math.sin(Math.PI / n));
-
-                const positions = [];
-                const base = [];
-
-                for (let i = 0; i < n; i++) {
-                    const a = i * angle;
-                    base.push(new THREE.Vector3(
-                        Math.cos(a) * R,
-                        0,
-                        Math.sin(a) * R
-                    ));
-                }
-
-                const apex = new THREE.Vector3(0, height, 0);
-
-                for (let i = 0; i < n; i++) {
-                    const a = base[i];
-                    const b = base[(i + 1) % n];
-
-                    positions.push(
-                        a.x, a.y, a.z,
-                        b.x, b.y, b.z,
-                        apex.x, apex.y, apex.z
-                    );
-                }
-
-                for (let i = 1; i < n - 1; i++) {
-                    const a = base[0];
-                    const b = base[i];
-                    const c = base[i + 1];
-
-                    positions.push(
-                        a.x, a.y, a.z,
-                        c.x, c.y, c.z,
-                        b.x, b.y, b.z
-                    );
-                }
-
-                const geom = new THREE.BufferGeometry();
-                geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
-                geom.computeVertexNormals();
-                return geom;
-            }
-
-            //--------------------------------
-            // 7. OBJETO
-            //--------------------------------
-            const material = new THREE.MeshStandardMaterial({
-                color: 0xffc930,
-                metalness: 0.2,
-                roughness: 0.5,
-                side: THREE.DoubleSide
-            });
-
-            const mesh = new THREE.Mesh(createPyramid(5, 1.3, 1.8), material);
-            scene.add(mesh);
-
-            //--------------------------------
-            // 8. RESIZE COMPLETO MOBILE
-            //--------------------------------
-            function resize() {
-                const w = window.innerWidth;
-                const h = window.innerHeight;
-
-                renderer.setSize(w, h);
-                camera.aspect = w / h;
-                camera.updateProjectionMatrix();
-            }
-
-            window.addEventListener("resize", resize);
-
-            //--------------------------------
-            // 9. LOOP DE ANIMAÇÃO
-            //--------------------------------
-            function animate() {
-                requestAnimationFrame(animate);
-
-                mesh.rotation.y += 0.005;
-                controls.update();
-                renderer.render(scene, camera);
-            }
-
-            animate();
-
-            document.getElementById("loading").style.display = "none";
-
-        } catch (error) {
-            window.onerror(error.message, "main", 0, 0, error);
-        }
-    </script>
-
-</body>
-</html>
+            scene.background = new THREE.Color(0x111111
