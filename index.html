@@ -1,435 +1,220 @@
-<!doctype html>
-<html lang="pt-BR">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pirâmide 3D — Auto-Fit (WebGL puro)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pirâmide WebGL Pura</title>
+
 <style>
-  :root{--ui-bg:rgba(0,0,0,0.5);--accent:#0bb}
-  html,body{height:100%;margin:0;background:#0b0b0f;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  #wrap{height:100vh;display:flex;flex-direction:column}
-  header{padding:10px 12px;background:linear-gradient(90deg,#022,#036);font-weight:700}
-  #stage{flex:1;position:relative}
-  canvas{width:100%;height:100%;display:block;touch-action:none}
-  #ui{position:absolute;left:12px;top:12px;background:var(--ui-bg);padding:10px;border-radius:8px;z-index:20;backdrop-filter:blur(4px)}
-  #ui label{display:block;font-size:13px;margin:6px 0}
-  #ui input[type=number], #ui select {width:140px;padding:4px}
-  button{background:var(--accent);border:0;padding:6px 8px;border-radius:6px;color:#003;cursor:pointer}
-  #note{position:absolute;right:12px;top:12px;background:rgba(0,0,0,0.45);padding:8px;border-radius:8px;font-size:13px}
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+    }
+    canvas {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        touch-action: none;
+    }
 </style>
 </head>
 <body>
-<div id="wrap">
-  <header>Pirâmide 3D — Auto-Fit</header>
-  <div id="stage">
-    <canvas id="gl"></canvas>
 
-    <div id="ui" aria-hidden="false">
-      <label>Modelo
-        <select id="model">
-          <option value="pyramid" selected>Pirâmide Regular</option>
-          <option value="custom">Custom (estrela)</option>
-        </select>
-      </label>
-
-      <label>Nº lados (base)
-        <input id="n" type="number" min="3" max="12" value="4">
-      </label>
-
-      <label>Lado da base (unidades)
-        <input id="side" type="number" step="0.1" min="0.2" value="4">
-      </label>
-
-      <label>Altura (unidades)
-        <input id="height" type="number" step="0.1" min="0.2" value="6">
-      </label>
-
-      <div style="margin-top:8px;display:flex;gap:8px">
-        <button id="rebuild">Gerar</button>
-        <button id="reset">Reset</button>
-      </div>
-    </div>
-
-    <div id="note">Arraste para rotacionar • Pinça para zoom • Roda do mouse funciona</div>
-  </div>
-</div>
+<canvas id="glcanvas"></canvas>
 
 <script>
-/* ========== Mini-motor WebGL com Auto-Fit ========== */
+/* =======================
+   CONFIGURAÇÃO DO WEBGL
+   ======================= */
+const canvas = document.getElementById("glcanvas");
+const gl = canvas.getContext("webgl", { antialias: true });
 
-/* --- GL setup --- */
-const canvas = document.getElementById('gl');
-const gl = canvas.getContext('webgl', {antialias:true});
-if(!gl){ document.body.innerHTML = "<div style='padding:20px;color:#fff;background:#900'>WebGL não suportado neste navegador.</div>"; throw new Error('WebGL not supported'); }
-
-function resize(){
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.floor(canvas.clientWidth * dpr);
-  canvas.height = Math.floor(canvas.clientHeight * dpr);
-  gl.viewport(0,0,canvas.width,canvas.height);
+if (!gl) {
+    alert("WebGL não suportado");
 }
-window.addEventListener('resize', resize);
+
+/* Ajusta para tela cheia */
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+}
+window.onresize = resize;
 resize();
 
-/* --- shaders (simple lambert + rim) --- */
-const vs = `
-attribute vec3 aPos;
-attribute vec3 aNormal;
-uniform mat4 uMVP;
-uniform mat4 uModel;
-varying vec3 vNormal;
-varying vec3 vWorld;
-void main(){
-  vNormal = mat3(uModel) * aNormal;
-  vWorld = (uModel * vec4(aPos,1.0)).xyz;
-  gl_Position = uMVP * vec4(aPos,1.0);
+/* ============================
+   SHADERS (VERTEX + FRAGMENT)
+   ============================ */
+const vsSource = `
+attribute vec3 position;
+attribute vec3 color;
+uniform mat4 mvp;
+varying vec3 vColor;
+void main() {
+    gl_Position = mvp * vec4(position, 1.0);
+    vColor = color;
 }
 `;
-const fs = `
+
+const fsSource = `
 precision mediump float;
-varying vec3 vNormal;
-varying vec3 vWorld;
-uniform vec3 uLightDir;
-uniform vec3 uColor;
-void main(){
-  vec3 N = normalize(vNormal);
-  vec3 L = normalize(uLightDir);
-  float diff = max(dot(N,L), 0.0);
-  vec3 V = normalize(-vWorld);
-  vec3 H = normalize(L+V);
-  float spec = pow(max(dot(N,H),0.0), 28.0);
-  float ambient = 0.12;
-  float rim = pow(1.0 - max(dot(N,V),0.0), 2.0);
-  vec3 col = uColor * (ambient + 0.88*diff) + spec*vec3(0.9) + 0.06*rim;
-  gl_FragColor = vec4(col, 1.0);
+varying vec3 vColor;
+void main() {
+    gl_FragColor = vec4(vColor, 1.0);
 }
 `;
 
-function compile(src, type){
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { throw new Error(gl.getShaderInfoLog(s)); }
-  return s;
-}
-const prog = gl.createProgram();
-gl.attachShader(prog, compile(vs, gl.VERTEX_SHADER));
-gl.attachShader(prog, compile(fs, gl.FRAGMENT_SHADER));
-gl.linkProgram(prog);
-if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-gl.useProgram(prog);
-
-/* --- attributes & uniforms --- */
-const ATTR = {
-  pos: gl.getAttribLocation(prog, 'aPos'),
-  normal: gl.getAttribLocation(prog, 'aNormal')
-};
-const UNI = {
-  mvp: gl.getUniformLocation(prog, 'uMVP'),
-  model: gl.getUniformLocation(prog, 'uModel'),
-  light: gl.getUniformLocation(prog, 'uLightDir'),
-  color: gl.getUniformLocation(prog, 'uColor')
-};
-
-/* --- buffers --- */
-const posBuf = gl.createBuffer();
-const norBuf = gl.createBuffer();
-let triCount = 0;
-
-/* --- math helpers --- */
-function mat4Identity(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
-function mat4Mul(a,b){
-  const o = new Float32Array(16);
-  for(let i=0;i<4;i++) for(let j=0;j<4;j++){
-    let s=0; for(let k=0;k<4;k++) s+=a[i*4+k]*b[k*4+j]; o[i*4+j]=s;
-  }
-  return o;
-}
-function mat4Perspective(fovy, aspect, near, far){
-  const f = 1/Math.tan(fovy/2);
-  const nf = 1/(near - far);
-  const out = new Float32Array(16);
-  out[0]=f/aspect; out[1]=0; out[2]=0; out[3]=0;
-  out[4]=0; out[5]=f; out[6]=0; out[7]=0;
-  out[8]=0; out[9]=0; out[10]=(far+near)*nf; out[11]=-1;
-  out[12]=0; out[13]=0; out[14]=(2*far*near)*nf; out[15]=0;
-  return out;
-}
-function mat4LookAt(eye, center, up){
-  const zx=eye[0]-center[0], zy=eye[1]-center[1], zz=eye[2]-center[2];
-  let zl = Math.hypot(zx,zy,zz)||1; const zxN=zx/zl, zyN=zy/zl, zzN=zz/zl;
-  let xx = up[1]*zzN - up[2]*zyN, xy = up[2]*zxN - up[0]*zzN, xz = up[0]*zyN - up[1]*zxN;
-  let xl = Math.hypot(xx,xy,xz)||1; xx/=xl; xy/=xl; xz/=xl;
-  let yx = zyN*xz - zzN*xy, yy = zzN*xx - zxN*xz, yz = zxN*xy - zyN*xx;
-  const m = new Float32Array(16);
-  m[0]=xx; m[1]=yx; m[2]=zxN; m[3]=0;
-  m[4]=xy; m[5]=yy; m[6]=zyN; m[7]=0;
-  m[8]=xz; m[9]=yz; m[10]=zzN; m[11]=0;
-  m[12]=-(xx*eye[0]+xy*eye[1]+xz*eye[2]);
-  m[13]=-(yx*eye[0]+yy*eye[1]+yz*eye[2]);
-  m[14]=-(zxN*eye[0]+zyN*eye[1]+zzN*eye[2]);
-  m[15]=1;
-  return m;
-}
-function mat4Translate(x,y,z){
-  const m = mat4Identity(); m[12]=x; m[13]=y; m[14]=z; return m;
-}
-function mat4RotateY(a){
-  const c=Math.cos(a), s=Math.sin(a), m=mat4Identity();
-  m[0]=c; m[2]=s; m[8]=-s; m[10]=c; return m;
-}
-function vec3Len(v){ return Math.hypot(v[0],v[1],v[2]); }
-
-/* --- geometry builders --- */
-function buildPyramidGeometry(n, side, h){
-  const angleStep = (2*Math.PI)/n;
-  const R = side/(2*Math.sin(Math.PI/n));
-  const base=[];
-  for(let i=0;i<n;i++){ const a = i*angleStep + Math.PI/2; base.push([R*Math.cos(a),0,R*Math.sin(a)]); }
-  const apex=[0,h,0];
-  const pos=[], nor=[];
-  // lateral faces (flat normals)
-  for(let i=0;i<n;i++){
-    const a=base[i], b=base[(i+1)%n];
-    pos.push(...a,...b,...apex);
-    const nrm = triNormal(a,b,apex);
-    nor.push(...nrm,...nrm,...nrm);
-  }
-  // base fan (ensure normal downward)
-  for(let i=1;i<n-1;i++){
-    const a=base[0], b=base[i+1], c=base[i];
-    pos.push(...a,...b,...c);
-    let nrm = triNormal(a,b,c);
-    if(nrm[1]>0) nrm = nrm.map(x=>-x);
-    nor.push(...nrm,...nrm,...nrm);
-  }
-  return {positions: new Float32Array(pos), normals: new Float32Array(nor)};
+/* Compila shader */
+function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    return shader;
 }
 
-function buildCustomStar(){
-  // small custom model
-  const pos=[], nor=[];
-  const n=6, R=1.1, r=0.45;
-  const base=[];
-  for(let i=0;i<n;i++){ const a=i*(2*Math.PI)/n; base.push([Math.cos(a)*R,0,Math.sin(a)*R]); }
-  const inner=[];
-  for(let i=0;i<n;i++){ const a=i*(2*Math.PI)/n + Math.PI/n; inner.push([Math.cos(a)*r,0.8,Math.sin(a)*r]); }
-  let vi=0;
-  for(let i=0;i<n;i++){
-    const a=base[i], b=base[(i+1)%n], c=inner[i];
-    pos.push(...a,...b,...c); const nrm=triNormal(a,b,c); nor.push(...nrm,...nrm,...nrm);
-    const d=inner[i], e=inner[(i+1)%n], f=base[(i+1)%n];
-    pos.push(...d,...e,...f); const nrm2=triNormal(d,e,f); nor.push(...nrm2,...nrm2,...nrm2);
-  }
-  return {positions:new Float32Array(pos), normals:new Float32Array(nor)};
-}
-function triNormal(a,b,c){
-  const ux=b[0]-a[0], uy=b[1]-a[1], uz=b[2]-a[2];
-  const vx=c[0]-a[0], vy=c[1]-a[1], vz=c[2]-a[2];
-  const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
-  const L = Math.hypot(nx,ny,nz) || 1; return [nx/L, ny/L, nz/L];
-}
+const vertexShader = compile(gl.VERTEX_SHADER, vsSource);
+const fragmentShader = compile(gl.FRAGMENT_SHADER, fsSource);
 
-/* --- upload geometry --- */
-function uploadGeometry(geom){
-  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.positions, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(ATTR.pos);
-  gl.vertexAttribPointer(ATTR.pos, 3, gl.FLOAT, false, 0, 0);
+/* Monta programa */
+const program = gl.createProgram();
+gl.attachShader(program, vertexShader);
+gl.attachShader(program, fragmentShader);
+gl.linkProgram(program);
+gl.useProgram(program);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, norBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, geom.normals, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(ATTR.normal);
-  gl.vertexAttribPointer(ATTR.normal, 3, gl.FLOAT, false, 0, 0);
+/* =======================
+   PIRÂMIDE (GEOMETRIA)
+   ======================= */
+const vertices = new Float32Array([
+    // Base (quadrado)
+    -1, 0, -1,   1, 0, 0,
+     1, 0, -1,   0, 1, 0,
+     1, 0,  1,   0, 0, 1,
+    -1, 0,  1,   1, 1, 0,
 
-  triCount = geom.positions.length / 3;
-  // compute bounding sphere
-  bounding = computeBoundingSphere(geom.positions);
-}
+    // Topo
+     0, 2, 0,    1, 0, 1,
+]);
 
-/* --- bounding sphere computation --- */
-let bounding = {center:[0,0,0], radius:1};
-function computeBoundingSphere(positions){
-  // axis-aligned bounding box center
-  let minX=1e9,minY=1e9,minZ=1e9,maxX=-1e9,maxY=-1e9,maxZ=-1e9;
-  for(let i=0;i<positions.length;i+=3){
-    const x=positions[i], y=positions[i+1], z=positions[i+2];
-    if(x<minX)minX=x; if(y<minY)minY=y; if(z<minZ)minZ=z;
-    if(x>maxX)maxX=x; if(y>maxY)maxY=y; if(z>maxZ)maxZ=z;
-  }
-  const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
-  let r=0;
-  for(let i=0;i<positions.length;i+=3){
-    const dx=positions[i]-cx, dy=positions[i+1]-cy, dz=positions[i+2]-cz;
-    r = Math.max(r, Math.hypot(dx,dy,dz));
-  }
-  return {center:[cx,cy,cz], radius: r};
-}
+const indices = new Uint16Array([
+    0,1,2,
+    0,2,3,
 
-/* --- camera / orbit / auto-fit logic --- */
-let yaw = 0, pitch = 0.18;
-let distance = 5;
-let autoFit = true;
+    // laterais
+    0,1,4,
+    1,2,4,
+    2,3,4,
+    3,0,4
+]);
 
-// compute required distance for fit using both vertical and horizontal FOV
-function computeFitDistance(radius){
-  // vertical fov in radians (we choose 60 deg)
-  const vFov = Math.PI/3; // 60deg
-  const aspect = Math.max(0.1, canvas.width / canvas.height);
-  const hFov = 2 * Math.atan(Math.tan(vFov/2) * aspect);
-  // distance for vertical and horizontal
-  const dV = radius / Math.sin(vFov/2);
-  const dH = radius / Math.sin(hFov/2);
-  const d = Math.max(dV, dH);
-  return d * 1.12 + 0.15; // small margin
+/* Buffer de vértices */
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+/* Buffer de índices */
+const ibo = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+/* Atributos */
+const stride = 6 * 4;
+const posLoc = gl.getAttribLocation(program, "position");
+gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
+gl.enableVertexAttribArray(posLoc);
+
+const colLoc = gl.getAttribLocation(program, "color");
+gl.vertexAttribPointer(colLoc, 3, gl.FLOAT, false, stride, 12);
+gl.enableVertexAttribArray(colLoc);
+
+/* =======================
+   MATRIZES 3D
+   ======================= */
+function matMul(a, b) {
+    const o = new Array(16);
+    for (let i = 0; i < 4; i++)
+        for (let j = 0; j < 4; j++)
+            o[i*4+j] = a[i*4+0]*b[0*4+j] + a[i*4+1]*b[1*4+j] + a[i*4+2]*b[2*4+j] + a[i*4+3]*b[3*4+j];
+    return o;
 }
 
-// orbit input handling (pointer + pinch)
-let pointers = {};
-canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId); pointers[e.pointerId]=e; lastPointerTime = performance.now(); }, {passive:false});
-canvas.addEventListener('pointermove', e => {
-  if(!pointers[e.pointerId]) return;
-  const prev = pointers[e.pointerId];
-  pointers[e.pointerId] = e;
-  const all = Object.values(pointers);
-  if(all.length === 1){
-    const dx = e.clientX - prev.clientX;
-    const dy = e.clientY - prev.clientY;
-    yaw += dx * 0.005;
-    pitch += dy * 0.005;
-    pitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, pitch));
-    autoFit = false; // user override
-  } else if(all.length === 2){
-    const a = all[0], b = all[1];
-    const dNow = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    if(typeof canvas._lastPinch !== 'undefined'){
-      const diff = dNow - canvas._lastPinch;
-      distance *= 1 - diff*0.003;
-      distance = Math.max(0.5, Math.min(40, distance));
+function perspective(fov, aspect, near, far) {
+    const f = 1 / Math.tan(fov / 2);
+    return [
+        f/aspect,0,0,0,
+        0,f,0,0,
+        0,0,(far+near)/(near-far),-1,
+        0,0,(2*far*near)/(near-far),0
+    ];
+}
+
+function translate(x,y,z) {
+    return [
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        x,y,z,1
+    ];
+}
+
+function rotateY(a) {
+    return [
+        Math.cos(a),0,Math.sin(a),0,
+        0,1,0,0,
+        -Math.sin(a),0,Math.cos(a),0,
+        0,0,0,1
+    ];
+}
+
+/* =======================
+   INTERAÇÃO DE TOQUE
+   ======================= */
+let rot = 0;
+let dragging = false;
+let oldX = 0;
+
+canvas.addEventListener("touchstart", e => {
+    dragging = true;
+    oldX = e.touches[0].clientX;
+});
+
+canvas.addEventListener("touchmove", e => {
+    if (dragging) {
+        const x = e.touches[0].clientX;
+        rot += (x - oldX) * 0.01;
+        oldX = x;
     }
-    canvas._lastPinch = dNow;
-  }
-}, {passive:false});
-canvas.addEventListener('pointerup', e => { delete pointers[e.pointerId]; canvas._lastPinch = undefined; try{ canvas.releasePointerCapture && canvas.releasePointerCapture(e.pointerId); }catch(_){} }, {passive:false});
-canvas.addEventListener('pointercancel', e => { delete pointers[e.pointerId]; canvas._lastPinch = undefined; });
+});
 
-// wheel zoom
-canvas.addEventListener('wheel', e => { e.preventDefault(); distance *= 1 + e.deltaY*0.0015; distance = Math.max(0.3, Math.min(80, distance)); }, {passive:false});
+canvas.addEventListener("touchend", () => dragging = false);
 
-/* --- UI wiring --- */
-const elModel = document.getElementById('model');
-const elN = document.getElementById('n');
-const elSide = document.getElementById('side');
-const elHeight = document.getElementById('height');
-document.getElementById('rebuild').addEventListener('click', rebuildScene);
-document.getElementById('reset').addEventListener('click', ()=>{ yaw=0; pitch=0.18; autoFit=true; applyAutoFit(); });
+/* =======================
+   LOOP DE RENDERIZAÇÃO
+   ======================= */
+const mvpLoc = gl.getUniformLocation(program, "mvp");
 
-/* --- initial program state --- */
-gl.enable(gl.DEPTH_TEST);
-gl.enable(gl.CULL_FACE);
-gl.clearColor(0.03,0.03,0.05,1);
-let modelMatrix = mat4Identity();
+function render() {
+    rot += 0.01;
 
-let lightDir = [5,8,3];
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
 
-/* --- GL buffers declared earlier --- */
-gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-gl.vertexAttribPointer(ATTR.pos, 3, gl.FLOAT, false, 0, 0);
-gl.enableVertexAttribArray(ATTR.pos);
-gl.bindBuffer(gl.ARRAY_BUFFER, norBuf);
-gl.vertexAttribPointer(ATTR.normal, 3, gl.FLOAT, false, 0, 0);
-gl.enableVertexAttribArray(ATTR.normal);
+    const proj = perspective(Math.PI/3, canvas.width/canvas.height, 0.1, 100);
+    const view = translate(0,-1,-6);
+    const model = rotateY(rot);
 
-/* --- rebuild / initial --- */
-function rebuildScene(){
-  const model = elModel.value;
-  let geom = (model === 'pyramid') ? buildPyramidGeometry(parseInt(elN.value)||4, parseFloat(elSide.value)||4, parseFloat(elHeight.value)||6) : buildCustomStar();
-  uploadGeometry(geom);
-  // compute fit
-  applyAutoFit();
-  // update UI metrics if pyramid
-  if(model==='pyramid'){
-    const n=parseInt(elN.value)||4, l=parseFloat(elSide.value)||4, h=parseFloat(elHeight.value)||6;
-    updateMetrics(n,l,h);
-  } else {
-    updateMetrics(0,0,0);
-  }
-}
-function applyAutoFit(){
-  if(!bounding) return;
-  const r = bounding.radius;
-  const d = computeFitDistance(r);
-  distance = d;
-  // place camera to a default yaw/pitch (nice view)
-  yaw = yaw || 0.5;
-  pitch = pitch || 0.18;
-}
-rebuildScene();
+    const mvp = matMul(matMul(proj, view), model);
 
-/* --- metrics (simple) --- */
-function updateMetrics(n,l,h){
-  if(n<=2){ document.getElementById('mPerimeter').innerText='-'; return; }
-  const P = n*l;
-  const ap = l/(2*Math.tan(Math.PI/n));
-  const Ab = (P*ap)/2;
-  const R = l/(2*Math.sin(Math.PI/n));
-  const midAngle = Math.PI/2 + (Math.PI/n);
-  const mx = R*Math.cos(midAngle), mz = R*Math.sin(midAngle);
-  const a1 = Math.sqrt(mx*mx + mz*mz + h*h);
-  const AL = (P*a1)/2;
-  const AT = Ab + AL;
-  const V = (Ab*h)/3;
-  document.getElementById('mPerimeter').innerText = `Perímetro: ${P.toFixed(3)} cm`;
-  document.getElementById('mAreaBase').innerText = `Área base: ${Ab.toFixed(3)} cm²`;
-  document.getElementById('mAreaLat').innerText = `Área lateral: ${AL.toFixed(3)} cm²`;
-  document.getElementById('mAreaTot').innerText = `Área total: ${AT.toFixed(3)} cm²`;
-  document.getElementById('mVolume').innerText = `Volume: ${V.toFixed(3)} cm³`;
+    gl.uniformMatrix4fv(mvpLoc, false, new Float32Array(mvp));
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+    requestAnimationFrame(render);
 }
 
-/* --- render loop --- */
-function render(){
-  resize();
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  // projection
-  const aspect = Math.max(0.001, canvas.width / canvas.height);
-  const vFov = Math.PI/3; // 60deg
-  // adjust near/far dynamically around bounding sphere & distance
-  const r = bounding.radius;
-  const near = Math.max(0.01, distance - r*3);
-  const far = distance + r*3 + 50;
-  const proj = mat4Perspective(vFov, aspect, near, far);
-
-  // camera position (spherical -> cartesian) around bounding.center
-  const c = bounding.center;
-  const cx = c[0] + distance * Math.cos(pitch) * Math.sin(yaw);
-  const cy = c[1] + distance * Math.sin(pitch);
-  const cz = c[2] + distance * Math.cos(pitch) * Math.cos(yaw);
-
-  const view = mat4LookAt([cx,cy,cz], c, [0,1,0]);
-
-  const mvp = mat4Mul(proj, mat4Mul(view, modelMatrix));
-  gl.uniformMatrix4fv(UNI.mvp, false, mvp);
-  gl.uniformMatrix4fv(UNI.model, false, modelMatrix);
-  gl.uniform3f(UNI.light, lightDir[0], lightDir[1], lightDir[2]);
-  gl.uniform3f(UNI.color, 0.85, 0.55, 0.32);
-
-  gl.drawArrays(gl.TRIANGLES, 0, triCount);
-
-  requestAnimationFrame(render);
-}
-requestAnimationFrame(render);
-
-/* --- helpers: custom star for custom model --- */
-function buildCustomStar(){ return buildCustomStar; } // placeholder (not used often)
-
-/* --- initial UI metrics placeholders --- */
-(function initMetricsPlaceholders(){
-  const el = document.createElement('div');
-  el.style.display='none';
-})();
-
-/* ========== END ========== */
-
+render();
 </script>
 </body>
 </html>
