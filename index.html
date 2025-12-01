@@ -1,71 +1,348 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+<!doctype html>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <title>Pirâmide 3D — Ultra Mobile Fix</title>
-
-    <style>
-        body {
-            margin: 0;
-            background: #000;
-            overflow: hidden;
-            font-family: Arial;
-            color: white;
-        }
-        #errorBox {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background: rgba(255, 0, 0, 0.9);
-            padding: 10px;
-            display: none;
-            white-space: pre-wrap;
-            z-index: 99999;
-        }
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 22px;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini-THREE — Pirâmide (engine próprio)</title>
+<style>
+  :root{--bg:#0f1720;--panel:#0b1220;--accent:#ffcc33;--muted:#9aa7b2}
+  html,body{height:100%;margin:0;background:var(--bg);color:#e6eef3;font-family:Inter,Arial,Helvetica,sans-serif}
+  #app{display:flex;flex-direction:column;height:100vh}
+  header{padding:10px 14px;background:linear-gradient(90deg,#071220,#0b1220);display:flex;align-items:center;gap:12px}
+  header h1{font-size:15px;margin:0;color:var(--accent)}
+  main{flex:1;display:flex;gap:12px;min-height:0}
+  #canvasWrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+  canvas{width:100%;height:100%;display:block}
+  #ui{width:320px;max-width:40%;background:var(--panel);padding:12px;border-left:1px solid rgba(255,255,255,0.02);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);overflow:auto}
+  label{display:block;font-size:13px;color:var(--muted);margin-top:10px}
+  select,input{width:100%;padding:8px;border-radius:8px;border:0;background:#071220;color:#e6eef3;margin-top:6px}
+  button{margin-top:10px;padding:10px;border-radius:8px;border:0;background:var(--accent);color:#071220;font-weight:600;cursor:pointer}
+  .metric{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;margin-top:10px;font-size:13px}
+  #errmsg{position:absolute;left:8px;top:8px;background:rgba(255,0,0,0.9);padding:8px;border-radius:6px;display:none;z-index:99}
+  footer{padding:8px 12px;font-size:12px;color:var(--muted);text-align:center}
+  @media (max-width:900px){main{flex-direction:column}#ui{width:100%;max-width:100%}}
+</style>
 </head>
-
 <body>
-    <div id="errorBox"></div>
-    <div id="loading">Carregando...</div>
+<div id="app">
+  <header>
+    <h1>Mini-THREE — Pirâmide (motor próprio)</h1>
+    <div style="font-size:12px;color:var(--muted)">Toque: arrastar = rotacionar · pinça = zoom</div>
+  </header>
 
-    <!-- ✔ Agora os scripts só rodam DEPOIS de carregar -->
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/examples/js/controls/OrbitControls.min.js"></script>
+  <main>
+    <div id="canvasWrap">
+      <div id="errmsg"></div>
+      <canvas id="glcanvas"></canvas>
+    </div>
 
-    <script>
-    window.onerror = function(msg, url, line, col, error) {
-        const box = document.getElementById("errorBox");
-        box.style.display = "block";
-        box.textContent =
-            "ERRO DETECTADO:\n" +
-            msg + "\n" +
-            (error ? error.stack : "");
-    };
-    </script>
+    <aside id="ui">
+      <label>Tipo de base (n lados)
+        <select id="sides"><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option></select>
+      </label>
 
-    <!-- 🚀 Código principal só roda quando TUDO carregar -->
-    <script>
-    window.addEventListener("load", () => {
-        try {
+      <label>Comprimento do lado da base (cm)
+        <input id="sideLen" type="number" min="0.1" step="0.1" value="4">
+      </label>
 
-            if (!window.THREE) {
-                throw new Error("THREE.js NÃO carregou no dispositivo.");
-            }
+      <label>Altura da pirâmide (cm)
+        <input id="height" type="number" min="0.1" step="0.1" value="6">
+      </label>
 
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+      <button id="build">Gerar Pirâmide</button>
+      <button id="reset">Reset View</button>
 
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111111
+      <div class="metric" id="metrics">
+        <strong>Métricas</strong>
+        <div id="mPerimeter">Perímetro: —</div>
+        <div id="mAreaBase">Área base: —</div>
+        <div id="mAreaLat">Área lateral: —</div>
+        <div id="mAreaTotal">Área total: —</div>
+        <div id="mVolume">Volume: —</div>
+      </div>
+
+      <div style="font-size:12px;color:var(--muted);margin-top:12px">
+        Renderização por software (Canvas2D). Compatível com celulares sem bibliotecas externas.
+      </div>
+    </aside>
+  </main>
+
+  <footer>Mini-engine — DanThePoggers</footer>
+</div>
+
+<script>
+/* -------------------------
+   Utilitários vetoriais/matrizes
+   simples (float arrays)
+   ------------------------- */
+function v3(x=0,y=0,z=0){ return {x:x,y:y,z:z}; }
+function sub(a,b){ return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z}; }
+function add(a,b){ return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z}; }
+function cross(a,b){ return { x: a.y*b.z - a.z*b.y, y: a.z*b.x - a.x*b.z, z: a.x*b.y - a.y*b.x }; }
+function dot(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+function norm(a){ const L=Math.hypot(a.x,a.y,a.z)||1; return {x:a.x/L,y:a.y/L,z:a.z/L}; }
+
+function rotateY(v,ang){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  return {x: v.x*c + v.z*s, y:v.y, z: -v.x*s + v.z*c};
+}
+function rotateX(v,ang){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  return {x:v.x, y: v.y*c - v.z*s, z: v.y*s + v.z*c};
+}
+
+/* -------------------------
+   Canvas 2D renderer (painter)
+   ------------------------- */
+const canvas = document.getElementById('glcanvas');
+const ctx = canvas.getContext('2d');
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function fitCanvas(){
+  const wrap = canvas.parentElement;
+  canvas.width = Math.floor(wrap.clientWidth * DPR);
+  canvas.height = Math.floor(wrap.clientHeight * DPR);
+  canvas.style.width = wrap.clientWidth + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  centerX = canvas.width/2;
+  centerY = canvas.height/2;
+}
+window.addEventListener('resize', ()=>{ DPR = Math.min(window.devicePixelRatio||1,2); fitCanvas(); });
+
+let centerX=0, centerY=0;
+
+/* -------------------------
+   Geometria da pirâmide real
+   ------------------------- */
+function createPyramidGeometry(n, sideLen, height) {
+  // base polygon vertices on y=0, apex at (0,height,0)
+  const verts = [];
+  const tris = []; // each tri: [i0,i1,i2]
+  const angle = (2*Math.PI)/n;
+  const R = sideLen / (2*Math.sin(Math.PI/n));
+  for(let i=0;i<n;i++){
+    const a = i*angle + Math.PI/2;
+    verts.push(v3(R*Math.cos(a), 0, R*Math.sin(a)));
+  }
+  const apexIndex = verts.length;
+  verts.push(v3(0, height, 0));
+  // lateral faces
+  for(let i=0;i<n;i++){
+    const a = i;
+    const b = (i+1)%n;
+    tris.push([a,b,apexIndex]);
+  }
+  // base fan (triangle list)
+  for(let i=1;i<n-1;i++){
+    tris.push([0, i+1, i]);
+  }
+  return { verts, tris };
+}
+
+/* -------------------------
+   Projection & drawing
+   ------------------------- */
+let cameraDist = 6;
+let rotX = -0.35, rotY = 0.6; // initial angles
+let lightDir = norm(v3(0.5,1,0.2));
+
+function project(v){
+  // camera is at (0,0,cameraDist) looking toward -Z (origin)
+  const z = v.z + cameraDist;
+  const fov = 60 * Math.PI/180;
+  const f = (canvas.height/ DPR) / (2 * Math.tan(fov/2));
+  const x = (v.x * f) / z * DPR + centerX;
+  const y = -(v.y * f) / z * DPR + centerY;
+  return {x,y,z};
+}
+
+function drawScene(geom){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // transform verts
+  const tverts = geom.verts.map(p => {
+    let v = rotateY(p, rotY);
+    v = rotateX(v, rotX);
+    return v;
+  });
+
+  // compute triangles with depth and shading
+  const drawn = [];
+  for(const tri of geom.tris){
+    const A = tverts[tri[0]], B = tverts[tri[1]], C = tverts[tri[2]];
+    // normal in world (model) coordinates
+    const e1 = sub(B,A), e2 = sub(C,A);
+    const nrm = norm(cross(e1,e2));
+    // backface cull: dot(n, viewDir) < 0
+    const viewDir = norm({x:0 - A.x, y:0 - A.y, z: cameraDist - A.z});
+    const facing = dot(nrm, viewDir);
+    if(facing <= 0) continue;
+
+    // shading
+    const shade = Math.max(0.05, dot(nrm, lightDir));
+    // project
+    const pA = project(A), pB = project(B), pC = project(C);
+    const zAvg = (pA.z + pB.z + pC.z)/3;
+    drawn.push({p:[pA,pB,pC],z:zAvg,shade,normal:nrm});
+  }
+
+  // painter sort (far to near)
+  drawn.sort((a,b)=> b.z - a.z);
+
+  // draw polygons
+  for(const d of drawn){
+    ctx.beginPath();
+    ctx.moveTo(d.p[0].x, d.p[0].y);
+    ctx.lineTo(d.p[1].x, d.p[1].y);
+    ctx.lineTo(d.p[2].x, d.p[2].y);
+    ctx.closePath();
+    const baseColor = [255,204,48]; // accent
+    const r = Math.floor(baseColor[0]*d.shade);
+    const g = Math.floor(baseColor[1]*d.shade);
+    const b = Math.floor(baseColor[2]*d.shade);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(0,0,0,0.12)`;
+    ctx.lineWidth = Math.max(0.5, DPR*0.7);
+    ctx.stroke();
+  }
+}
+
+/* -------------------------
+   Interaction (mouse + touch)
+   ------------------------- */
+let isDown=false, lastX=0, lastY=0;
+canvas.addEventListener('mousedown', (e)=>{
+  isDown=true; lastX=e.clientX; lastY=e.clientY;
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!isDown) return;
+  const dx = (e.clientX - lastX) / 200;
+  const dy = (e.clientY - lastY) / 200;
+  rotY += dx; rotX += dy;
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('mouseup', ()=> isDown=false);
+canvas.addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  cameraDist += e.deltaY * 0.01;
+  cameraDist = Math.max(1.2, Math.min(30, cameraDist));
+},{passive:false});
+
+// touch
+let touchState = {mode:'none', x0:0,y0:0, d0:0};
+canvas.addEventListener('touchstart', (e)=>{
+  if(e.touches.length===1){
+    touchState.mode='pan';
+    touchState.x0 = e.touches[0].clientX;
+    touchState.y0 = e.touches[0].clientY;
+  } else if(e.touches.length===2){
+    touchState.mode='pinch';
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchState.d0 = Math.hypot(dx,dy);
+  }
+});
+canvas.addEventListener('touchmove', (e)=>{
+  e.preventDefault();
+  if(touchState.mode==='pan' && e.touches.length===1){
+    const dx = (e.touches[0].clientX - touchState.x0) / 200;
+    const dy = (e.touches[0].clientY - touchState.y0) / 200;
+    rotY += dx; rotX += dy;
+    touchState.x0 = e.touches[0].clientX; touchState.y0 = e.touches[0].clientY;
+  } else if(touchState.mode==='pinch' && e.touches.length===2){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const d = Math.hypot(dx,dy);
+    const diff = (touchState.d0 - d) * 0.02;
+    cameraDist += diff;
+    cameraDist = Math.max(1.2, Math.min(60, cameraDist));
+    touchState.d0 = d;
+  }
+},{passive:false});
+canvas.addEventListener('touchend',(e)=>{ if(e.touches.length===0) touchState.mode='none'; });
+
+/* -------------------------
+   Metrics (geometry math)
+   ------------------------- */
+function computeMetrics(n,l,h){
+  const P = n*l;
+  const ap = l / (2*Math.tan(Math.PI/n));
+  const Ab = (P * ap)/2;
+  const R = l / (2*Math.sin(Math.PI/n));
+  const midAngle = Math.PI/2 + (Math.PI/n);
+  const mx = R*Math.cos(midAngle);
+  const mz = R*Math.sin(midAngle);
+  const a1 = Math.sqrt(mx*mx + mz*mz + h*h);
+  const AL = (P * a1)/2;
+  const AT = Ab + AL;
+  const V = (Ab * h)/3;
+  return {P,Ab,AL,AT,V};
+}
+
+/* -------------------------
+   App flow
+   ------------------------- */
+let geom = createPyramidGeometry(4,4,6);
+function updateMetrics(n,l,h){
+  const m = computeMetrics(n,l,h);
+  document.getElementById('mPerimeter').innerText = `Perímetro: ${m.P.toFixed(3)} cm`;
+  document.getElementById('mAreaBase').innerText = `Área base: ${m.Ab.toFixed(3)} cm²`;
+  document.getElementById('mAreaLat').innerText = `Área lateral: ${m.AL.toFixed(3)} cm²`;
+  document.getElementById('mAreaTotal').innerText = `Área total: ${m.AT.toFixed(3)} cm²`;
+  document.getElementById('mVolume').innerText = `Volume: ${m.V.toFixed(3)} cm³`;
+}
+
+function buildFromUI(){
+  const n = parseInt(document.getElementById('sides').value) || 4;
+  const s = Math.max(0.1, parseFloat(document.getElementById('sideLen').value) || 4);
+  const h = Math.max(0.1, parseFloat(document.getElementById('height').value) || 6);
+  geom = createPyramidGeometry(n,s,h);
+  updateMetrics(n,s,h);
+  // reset view a bit
+  cameraDist = Math.max(1.8, Math.min(40, Math.max(3, s + h)));
+  rotX = -0.3; rotY = 0.6;
+  document.getElementById('errmsg').style.display='none';
+}
+document.getElementById('build').addEventListener('click', buildFromUI);
+document.getElementById('reset').addEventListener('click', ()=>{ rotX=-0.35; rotY=0.6; cameraDist=6; });
+
+/* initial sizing and start */
+fitCanvas();
+buildFromUI();
+
+/* render loop */
+(function loop(){
+  // if canvas not visible height 0, skip
+  if(canvas.width === 0 || canvas.height === 0){
+    requestAnimationFrame(loop);
+    return;
+  }
+  drawScene(geom);
+  requestAnimationFrame(loop);
+})();
+
+/* initial instructions for small screens */
+setTimeout(()=>{ if(window.innerWidth<600){ 
+  const el = document.createElement('div');
+  el.style.position='absolute'; el.style.bottom='12px'; el.style.left='12px';
+  el.style.padding='8px 10px'; el.style.background='rgba(0,0,0,0.5)'; el.style.borderRadius='8px';
+  el.style.fontSize='13px'; el.style.color='white';
+  el.innerText='Toque: arraste para rotacionar · pinça para zoom';
+  document.body.appendChild(el);
+}},1200);
+
+/* Error helper (visible) */
+function showError(msg){
+  const e = document.getElementById('errmsg');
+  e.style.display='block'; e.innerText = msg;
+}
+
+/* quick fallback if WebGL is required elsewhere */
+try{
+  // basic check (not required), but keep for debug
+  const test = document.createElement('canvas').getContext('2d');
+  if(!test) showError('Canvas 2D não disponível neste navegador.');
+}catch(err){ showError('Erro: '+err); }
+</script>
+</body>
+</html>
